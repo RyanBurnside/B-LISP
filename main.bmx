@@ -9,6 +9,16 @@ Import Text.format
 '    <- expt ------------------>   <- fraction ---------->
 '                                    <tag>   < also avail>
 
+Type Bcons
+	Field value:Double
+
+	Method DecodeType()
+	End Method
+
+    Method DecodeValue()
+	End Method
+End Type
+
 Type Token
     Field typ:String
     Field value:String
@@ -30,10 +40,24 @@ Type Token
 	End Method
 End Type
 
-Function Tokenize:Token[](s:String)
-	' Regex documentation https://www.blitzmax.org/docs/en/api/text/text.regex/
+' This is the regex table (to be transformed) for B-LISP
+Function makeRegexTableBlisp:String[][] ()
+	' Regex groups, order by most specific to least
+	Return [["SYMBOL",    "[A-Za-z!@#$%^&*-+\\<>]+"],
+			["NUMBER",    "\d+(\.\d*)?"],
+		    ["BACKQUOTE", "`"],
+		    ["SPLICE",    ",@"],
+		    ["COMMA",     ","],
+		    ["QUOTE",     "'"],
+            ["LPAREN",    "\("],
+            ["RPAREN",    "\)"],
+		    ["DOT",       "\."],
+            ["SKIP",      "[ \t]"]]
+End Function
 
-    ' Accessory fn to transform the tokenSpecification arrays into a final regex
+' This turns a regex table into a single regex with named capture groups
+Function RegexTableToRegex:TRegEx(regexTable:String[][])
+	' Accessory fn to transform the tokenSpecification sub arrays into regex group
 	Function JoinTokenSpecs:String(ID:String, Regex:String)
 		Global regPair:TFormatter = TFormatter.Create("(?P<%s>%s)")
 		regPair.clear()
@@ -41,36 +65,26 @@ Function Tokenize:Token[](s:String)
 		Return regPair.format()
 	End Function
 	
-	' Regex groups, order by most specific to least
-	Local tokenSpecification:String[][] = .. 'TODO make these second strings /truly/ regex strings
-	    [["SYMBOL",    "[A-Za-z!@#$%^&*-+\\<>]+"],
-	     ["NUMBER",    "\d+(\.\d*)?"],
-		 ["BACKQUOTE", "`"],
-		 ["SPLICE",    ",@"],
-		 ["COMMA",     ","],
-		 ["QUOTE",     "'"],
-         ["LPAREN",    "\("],
-         ["RPAREN",    "\)"],       
-		 ["DOT",       "\."],
-         ["SKIP",      "[ \t]"]]
-
-	Local temp:String[tokenSpecification.Length]
+	Local temp:String[regexTable.Length]
 	Local counter:Int = 0
-	
-	For Local i:String[] = EachIn tokenSpecification
+
+	For Local i:String[] = EachIn regexTable
 		temp[counter] = JoinTokenSpecs(i[0], i[1])
-		counter = counter + 1
+		counter :+ 1
 	Next
 	
-	Local list:TList = New TList
 	' Multi-Part joined Regex String for token
-	Local tokRegex:String = "|".join(temp)
+	Return TRegEx.Create("|".join(temp))
+End Function
+
+Function Tokenize(regexTable:String[][], s:String)
+	' Regex documentation https://www.blitzmax.org/docs/en/api/text/text.regex/
 	
 	' Regex Class
-	Local getToken:TRegEx = TRegEx.Create(tokRegex)
+	Local getToken:TRegEx = RegexTableToRegex(regexTable)
 	
 	' Regex match class
-	Local match:TRegExMatch = getToken.Find(s)
+	Local matcher:TRegExMatch = getToken.Find(s)
 	
 	' Tokenization details
 	Local line:Int = 1
@@ -80,15 +94,16 @@ Function Tokenize:Token[](s:String)
 	' Collects tokens from list
 	Local tokenList:TList = New TList
 	
-	While match
-        For Local n:String = EachIn ["SYMBOL", "NUMBER", "BACKQUOTE", "SPLICE", "COMMA", "QUOTE", "LPAREN", "RPAREN", "DOT", "SKIP"]
-			Local m:String = match.SubExpByName(n)
-			If m <> "" And n <> "SKIP"
-				tokenList.AddLast(New Token(n, m, -1, -1))
+	While matcher
+        For Local n:String[] = EachIn regexTable
+			Local captureName:String = n[0]
+			Local matched:String = matcher.SubExpByName(captureName)
+			If matched <> "" And captureName <> "SKIP"
+				tokenList.AddLast(New Token(captureName, matched, -1, -1))
 			    Exit ' early break, 1 match per regex
 			End If 
         Next
-        match = getToken.Find()
+        matcher = getToken.Find()
     Wend
 
 	For Local t:Token = EachIn(tokenList)
@@ -100,10 +115,9 @@ Local statements:String = """
     (* (+ FOO *BAR* +BAZ+ ) BAZ 42 43.5)
     `(,SYM ,@(1 2 3 4))
      '(3 . 4)
-    
 """
 
-Tokenize(statements)
+Tokenize(makeRegexTableBlisp(), statements)
 
 
 
