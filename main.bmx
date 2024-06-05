@@ -1,23 +1,10 @@
 SuperStrict
 
-Import brl.map
+Import brl.retro
 Import Text.RegEx
 Import Text.format
 
-' NaN boxing
-' |s b b b b | b b b b | b b b b | b b b b | ... | b b b b |
-'    <- expt ------------------>   <- fraction ---------->
-'                                    <tag>   < also avail>
-
-Type Bcons
-	Field value:Double
-
-	Method DecodeType()
-	End Method
-
-    Method DecodeValue()
-	End Method
-End Type
+Include "NaN.bmx"
 
 Type Token
     Field typ:String
@@ -100,7 +87,7 @@ Function Tokenize(regexTable:String[][], s:String)
 			Local matched:String = matcher.SubExpByName(captureName)
 			If matched <> "" And captureName <> "SKIP"
 				tokenList.AddLast(New Token(captureName, matched, -1, -1))
-			    Exit ' early break, 1 match per regex
+			    Exit ' early break, 1 match per regex (most specific)
 			End If 
         Next
         matcher = getToken.Find()
@@ -112,16 +99,12 @@ Function Tokenize(regexTable:String[][], s:String)
 End Function
 
 Local statements:String = """
-    (* (+ FOO *BAR* +BAZ+ ) BAZ 42 43.5)
+    (* (+ FOO *BAR* +BAZ+) BAZ 42 43.5)
     `(,SYM ,@(1 2 3 4))
      '(3 . 4)
 """
 
 Tokenize(makeRegexTableBlisp(), statements)
 
-
-
-
-	
-	
-	
+Local LISPOBJECTS:Double[8192]
+Print SizeOf(LISPOBJECTS)
