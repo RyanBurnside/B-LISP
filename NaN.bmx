@@ -54,5 +54,18 @@ Function ord:ULong(n:Double) Inline
 	Return temp
 End Function 
 
+' Does nothing, but could be extended to check for NaN
+Function num:Double(n:Double) Inline
+	Return n
+End Function
 
-
+' Returns nonzero if x equals y
+Function equ:ULong(x:Double, y:Double) Inline
+	Local temp:ULong
+	GCSuspend()
+	Local u_longptr_x:ULong Ptr = Varptr x
+	Local u_longptr_y:ULong Ptr = Varptr y
+	temp = (u_longptr_x[0] = u_longptr_y[0])
+	GCResume()
+	Return temp
+EndFunction
