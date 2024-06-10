@@ -1,6 +1,7 @@
 ' This module follows much of the TinyLisp (99 lines of C) implementation
 SuperStrict
 Import brl.retro
+Import text.format
 
 ' The following is a bit of a hack
 ' We want to force the Lisp expression (double) into being misread as an unsighed int
@@ -69,3 +70,82 @@ Function equ:ULong(x:Double, y:Double) Inline
 	GCResume()
 	Return temp
 EndFunction
+
+Function debugPrint(x:Double)
+	Local val:ULong
+	Local mask:ULong = $ff
+	
+	GCSuspend()
+	Local u_longptr:ULong Ptr = Varptr x
+	val = u_longptr[0]
+	mask :Shl 56
+	
+	Print "*** Debug Print ***"
+	Print "Analyzed double"
+	Print "Original double value " + String.FromDouble(x)
+	Print "Sign bit: " + String.FromLong(val Shr 63) ' doubele check
+	Print "Exponent: " + LongHex((val Shr 52) & $7FF)
+	Print "Mantissa: " + LongHex(val & $FFFFFFFFFFFFF:ULong)
+	If x = x Then Print "NaN: no" Else Print "NaN: yes" 
+	
+	Print "Raw Bytes From MSB to LSB"
+	Local numBytes:Int = SizeOf(val)
+	Local strBuff:String[] = New String[numBytes]
+	For Local i:Int = 0 Until numBytes
+		strBuff[i] = Hex((val & mask) Shr ((numBytes - 1 - i) * 8))[6..]
+        mask :Shr 8;
+	Next 
+	Print " ".Join(strBuff)
+	
+	Print "Individual Bits"
+	mask = ULong(1) Shl 63
+	Local bitBuffer:String = ""
+	Local labelBuffer:String = ""
+	For Local i:Int = 0 Until numBytes * 8
+		Select i
+		Case 1
+			bitBuffer :+ " "
+			labelBuffer :+ " "
+		Case 12
+			bitBuffer :+ " "
+			labelBuffer :+ " "
+		End Select
+		If (val & mask) bitBuffer :+ "1" Else bitBuffer :+ "0"
+		mask :Shr 1
+		
+		' label buffer updates
+		If i = 0 
+            labelBuffer :+ "s"
+        Else If i > 0 And i < 12
+            labelBuffer :+ "e"
+        Else
+            labelBuffer :+ "m"
+        End If
+		
+	Next
+	Print bitBuffer
+	Print labelBuffer
+	
+	Print "TinyLisp Representation"
+	Print "Tag Bits: " + LongHex(val Shr 48)
+	Print "Storage Bits: " + LongHex(val & $FFFFFFFFFFFF:ULong)
+	Print "*** end debug ***~n"
+	
+	GCResume()
+End Function
+
+debugPrint(-45.0)
+debugPrint(45.0)
+
+Local x:Double
+Local t:Short = $7ffc
+Local i:ULong = $112233445566:ULong
+
+GCSuspend()
+Local u_longptr:ULong Ptr = Varptr x
+u_longptr[0] = ULong(t) Shl 48 | i
+debugPrint(x)
+GCResume()
+
+
+
