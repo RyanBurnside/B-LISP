@@ -28,6 +28,17 @@ Const CONS:ULong = $7ffa  'cons cell
 Const CLOS:ULong = $7ffb  'closure
 Const NIL:ULong  = $7ffc  'duh
 
+Function tagToString:String(tag:ULong)
+	Select tag
+		Case ATOM Return "ATOM"
+		Case PRIM Return "PRIMITIVE"
+		Case CONS Return "CONS"
+		Case CLOS Return "CLOSURE"
+		Case NIL Return "NIL"
+		Default Return "UNKNOWN TYPE"
+	End Select
+End Function
+
 Global nil_val:Double ' WHEN DO THESE GET ASSIGNED!?
 Global tru_val:Double 
 Global err_val:Double
@@ -78,14 +89,16 @@ Function debugPrint(x:Double)
 	GCSuspend()
 	Local u_longptr:ULong Ptr = Varptr x
 	val = u_longptr[0]
+	GCResume()
+	
 	mask :Shl 56
 	
 	Print "*** Debug Print ***"
 	Print "Analyzed double"
-	Print "Original double value " + String.FromDouble(x)
-	Print "Sign bit: " + String.FromLong(val Shr 63) ' doubele check
-	Print "Exponent: " + LongHex((val Shr 52) & $7FF)
-	Print "Mantissa: " + LongHex(val & $FFFFFFFFFFFFF:ULong)
+	Print "Original double value: " + String.FromDouble(x)
+	Print "Sign bit:" + String.FromLong(val Shr 63)
+	Print "Exponent: $" + Hex((val Shr 52) & $7FF)[5..]
+	Print "Mantissa: $" + LongHex(val & $FFFFFFFFFFFFF:ULong)[3..]
 	If x = x Then Print "NaN: no" Else Print "NaN: yes" 
 	
 	Print "Raw Bytes From MSB to LSB"
@@ -95,21 +108,18 @@ Function debugPrint(x:Double)
 		strBuff[i] = Hex((val & mask) Shr ((numBytes - 1 - i) * 8))[6..]
         mask :Shr 8;
 	Next 
-	Print " ".Join(strBuff)
+	Print "$"+" ".Join(strBuff)
 	
 	Print "Individual Bits"
 	mask = ULong(1) Shl 63
 	Local bitBuffer:String = ""
 	Local labelBuffer:String = ""
 	For Local i:Int = 0 Until numBytes * 8
-		Select i
-		Case 1
+		If (i = 1 Or i = 12) ' boundary spaces
 			bitBuffer :+ " "
 			labelBuffer :+ " "
-		Case 12
-			bitBuffer :+ " "
-			labelBuffer :+ " "
-		End Select
+		End If
+		
 		If (val & mask) bitBuffer :+ "1" Else bitBuffer :+ "0"
 		mask :Shr 1
 		
@@ -123,15 +133,16 @@ Function debugPrint(x:Double)
         End If
 		
 	Next
-	Print bitBuffer
 	Print labelBuffer
+	Print bitBuffer
+	
 	
 	Print "TinyLisp Representation"
-	Print "Tag Bits: " + LongHex(val Shr 48)
-	Print "Storage Bits: " + LongHex(val & $FFFFFFFFFFFF:ULong)
-	Print "*** end debug ***~n"
+	Local tagVal:ULong = val Shr 48
 	
-	GCResume()
+	Print "Tag Bits: $" + Hex(tagVal)[4..] + " (" + tagToString(tagVal) + ")"
+	Print "Storage Bits: $" + LongHex(val & $FFFFFFFFFFFF:ULong)
+	Print "*** end debug ***~n"
 End Function
 
 debugPrint(-45.0)
@@ -144,8 +155,11 @@ Local i:ULong = $112233445566:ULong
 GCSuspend()
 Local u_longptr:ULong Ptr = Varptr x
 u_longptr[0] = ULong(t) Shl 48 | i
-debugPrint(x)
 GCResume()
+
+debugPrint(x)
+
+
 
 
 
