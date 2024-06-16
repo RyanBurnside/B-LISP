@@ -1,4 +1,4 @@
-SuperStrict
+need To run toSuperStrict
 Import brl.map
 
 ' two simple sample functions

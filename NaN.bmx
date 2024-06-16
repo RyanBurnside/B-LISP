@@ -14,27 +14,38 @@ Function T:ULong(x:Double) Inline
 	Return result
 End Function
 
-Global N:UInt = 4096 ' number of Lisp objects (doubles) to store for the VM
+Global N:UInt = 1024 ' number of Lisp objects (doubles) to store for the VM
 
 Global hp:ULong = 0 ' heap pointer
 Global sp:ULong = N ' stack pointer
 
 Global cell:Double[N]
 
+Function reset()
+	Print "B-LISP: Resetting heap and stack,"
+	Print "B-LIsp: Using " + String(N) + " Cells."
+	hp = 0 ' heap pointer
+	sp = N ' stack pointer
+	cell = New Double[N]
+End Function
+
+' Reset
+reset()
+
 ' NaN box constant "tags"
-Const ATOM:ULong = $7ff8  'atom
-Const PRIM:ULong = $7ff9  'primitive
-Const CONS:ULong = $7ffa  'cons cell
-Const CLOS:ULong = $7ffb  'closure
-Const NIL:ULong  = $7ffc  'duh
+Const ATOM_TAG:ULong = $7ff8  'atom
+Const PRIM_TAG:ULong = $7ff9  'primitive
+Const CONS_TAG:ULong = $7ffa  'cons cell
+Const CLOS_TAG:ULong = $7ffb  'closure
+Const NIL_TAG:ULong  = $7ffc  'duh
 
 Function tagToString:String(tag:ULong)
 	Select tag
-		Case ATOM Return "ATOM"
-		Case PRIM Return "PRIMITIVE"
-		Case CONS Return "CONS"
-		Case CLOS Return "CLOSURE"
-		Case NIL Return "NIL"
+		Case ATOM_TAG Return "ATOM"
+		Case PRIM_TAG Return "PRIMITIVE"
+		Case CONS_TAG Return "CONS"
+		Case CLOS_TAG Return "CLOSURE"
+		Case NIL_TAG Return "NIL"
 		Default Return "UNKNOWN TYPE"
 	End Select
 End Function
@@ -145,21 +156,52 @@ Function debugPrint(x:Double)
 	Print "*** end debug ***~n"
 End Function
 
-debugPrint(-45.0)
-debugPrint(45.0)
+Function atom:Double(s:String)
+	Local i:ULong = 0
+	GCSuspend()
+	Local charPtr:Byte Ptr = cell
+	Local embeddedStr:String = String.FromCString(charPtr + i)
+	
+	While i < hp And embeddedStr <> s
+		embeddedStr = String.FromCString(charPtr + i)
+		i :+ embeddedStr.Length + 1 ' we will store as null terminated C string
+	Wend
+	
+	If i = hp
+		Local s_size:Size_T = s.Length + 1
+		hp :+ s_size
+		s.ToUTF8StringBuffer(charPtr + i, s_size)
+		Print s
+		If hp > (sp Shl 3)
+			Print "B-LISP: Critical Error! Heap pointer greater than stack pointer!"
+			reset()
+		EndIf
+	EndIf
+	GCResume()
+	Return box(ATOM_TAG, i)
+End Function
 
-Local x:Double
-Local t:Short = $7ffc
-Local i:ULong = $112233445566:ULong
+For Local test:String = EachIn ["fooooooo", 
+                                "barooooo", 
+                                "bazooooo"]
+	atom(test)
+Next
 
-GCSuspend()
-Local u_longptr:ULong Ptr = Varptr x
-u_longptr[0] = ULong(t) Shl 48 | i
-GCResume()
+Function dump()
+	GCSuspend()
+	Local p:Byte Ptr = cell
+	Local buffer:String = ""
+	For Local i:Int = 0 Until cell.Length * 8
+		If i Mod 40 = 0 Then buffer :+ "~n"
+		If p[0] <> 0 
+			buffer :+ Chr(p[0]) + " "
+		Else 
+			buffer :+ ". "
+		End If
+		p :+ 1
+	Next
+	Print buffer
+	GCResume()
+End Function
 
-debugPrint(x)
-
-
-
-
-
+dump()
