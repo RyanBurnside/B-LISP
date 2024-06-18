@@ -50,7 +50,7 @@ Function tagToString:String(tag:ULong)
 	End Select
 End Function
 
-Global nil_val:Double ' WHEN DO THESE GET ASSIGNED!?
+Global nil_val:Double ' Ask Pete about these...
 Global tru_val:Double 
 Global err_val:Double
 Global env_val:Double
@@ -92,6 +92,67 @@ Function equ:ULong(x:Double, y:Double) Inline
 	GCResume()
 	Return temp
 EndFunction
+
+Function atom:Double(s:String)
+	Local i:ULong = 0
+	GCSuspend()
+	Local charPtr:Byte Ptr = cell
+	Local embeddedStr:String = String.FromCString(charPtr + i)
+	
+	While i < hp And embeddedStr <> s
+		embeddedStr = String.FromCString(charPtr + i)
+		i :+ embeddedStr.Length + 1 ' we will store as null terminated C string
+	Wend
+	
+	If i = hp
+		Local s_size:Size_T = s.Length + 1
+		hp :+ s_size
+		s.ToUTF8StringBuffer(charPtr + i, s_size)
+		Print s
+		If hp > (sp Shl 3)
+			Print "B-LISP: Critical Error! Heap pointer greater than stack pointer!"
+			reset()
+		EndIf
+	EndIf
+	GCResume()
+	Return box(ATOM_TAG, i)
+End Function
+
+Function cons:Double(x:Double, y:Double)
+	sp :- 1
+	cell[sp] = x
+	sp :- 1
+	cell[sp] = y
+	If (hp > sp Shl 3) Then reset()
+	Return box(CONS_TAG, sp)
+End Function
+
+Function car:Double(p:Double) ' check
+	If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
+		Return cell[ord(p) + 1]
+	Else
+		Return err_val
+	End If 
+End Function
+
+Function cdr:Double(p:Double) ' check
+	If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
+		Return cell[ord(p)]
+	Else
+		Return err_val
+	End If 
+End Function
+
+Function pair:Double(v:Double, x:Double, e:Double) ' check
+	Return cons(cons(v, x), e)
+End Function
+
+Function closure:Double(v:Double, x:Double, e:Double) ' check
+	'  return box(CLOS,ord(pair(v,x,equ(e,env) ? nil : e))); }
+	Local env:Double
+	If equ(e, env_val) Then env = nil_val Else env = e
+	Return box(CLOS_TAG, ord(pair(v, x, env)))
+End Function
 
 Function debugPrint(x:Double)
 	Local val:ULong
@@ -156,34 +217,7 @@ Function debugPrint(x:Double)
 	Print "*** end debug ***~n"
 End Function
 
-Function atom:Double(s:String)
-	Local i:ULong = 0
-	GCSuspend()
-	Local charPtr:Byte Ptr = cell
-	Local embeddedStr:String = String.FromCString(charPtr + i)
-	
-	While i < hp And embeddedStr <> s
-		embeddedStr = String.FromCString(charPtr + i)
-		i :+ embeddedStr.Length + 1 ' we will store as null terminated C string
-	Wend
-	
-	If i = hp
-		Local s_size:Size_T = s.Length + 1
-		hp :+ s_size
-		s.ToUTF8StringBuffer(charPtr + i, s_size)
-		Print s
-		If hp > (sp Shl 3)
-			Print "B-LISP: Critical Error! Heap pointer greater than stack pointer!"
-			reset()
-		EndIf
-	EndIf
-	GCResume()
-	Return box(ATOM_TAG, i)
-End Function
-
-For Local test:String = EachIn ["fooooooo", 
-                                "barooooo", 
-                                "bazooooo"]
+For Local test:String = EachIn ["foo", "foo", "foo"]
 	atom(test)
 Next
 
