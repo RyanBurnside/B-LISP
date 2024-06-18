@@ -72,7 +72,7 @@ Function ord:ULong(n:Double) Inline
 	Local temp:ULong	
 	GCSuspend()
 	Local u_longptr:ULong Ptr = Varptr n
-	temp = u_longptr[0]
+	temp = u_longptr[0] & $ffffffffffff
 	GCResume()
 	Return temp
 End Function 
@@ -93,6 +93,7 @@ Function equ:ULong(x:Double, y:Double) Inline
 	Return temp
 EndFunction
 
+' interning of atom names (Lisp symbols), returns a unique NaN-boxed ATOM
 Function atom:Double(s:String)
 	Local i:ULong = 0
 	GCSuspend()
@@ -118,6 +119,7 @@ Function atom:Double(s:String)
 	Return box(ATOM_TAG, i)
 End Function
 
+' construct pair (x . y) returns a NaN-boxed CONS_TAG
 Function cons:Double(x:Double, y:Double)
 	sp :- 1
 	cell[sp] = x
@@ -127,6 +129,7 @@ Function cons:Double(x:Double, y:Double)
 	Return box(CONS_TAG, sp)
 End Function
 
+' return the car of the pair or ERR if not a pair
 Function car:Double(p:Double) ' check
 	If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
 		Return cell[ord(p) + 1]
@@ -135,6 +138,7 @@ Function car:Double(p:Double) ' check
 	End If 
 End Function
 
+' return the cdr of the pair or ERR if not a pair
 Function cdr:Double(p:Double) ' check
 	If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
 		Return cell[ord(p)]
@@ -143,16 +147,75 @@ Function cdr:Double(p:Double) ' check
 	End If 
 End Function
 
+' construct a pair to add to environment e, returns the list ((v . x) . e)
 Function pair:Double(v:Double, x:Double, e:Double) ' check
 	Return cons(cons(v, x), e)
 End Function
 
+' construct a closure, returns a NaN-boxed CLOS_TAG
 Function closure:Double(v:Double, x:Double, e:Double) ' check
 	'  return box(CLOS,ord(pair(v,x,equ(e,env) ? nil : e))); }
 	Local env:Double
 	If equ(e, env_val) Then env = nil_val Else env = e
 	Return box(CLOS_TAG, ord(pair(v, x, env)))
 End Function
+
+' look up a symbol in an environment, return its value or err if not found
+Function assoc:Double(v:Double, e:Double)
+	While T(e) = CONS_TAG And Not equ(v, car(car(e)))
+		e = cdr(e)
+	Wend
+	If T(e) = CONS_TAG Then Return cdr(car(e)) Else Return err_val
+End Function
+
+' lispNot(x) is nonzero if x is the lisp () empty list
+Function lispNot:ULong(x:Double)
+	Return T(x) = NIL_TAG
+End Function
+
+' let(x) is nonzero if x is a Lisp let/let* pair
+Function let:ULong(x:Double)
+	Return T(x) <> NIL_TAG  And (Not lispNot(cdr(x)))
+End Function
+
+Function evlis:Double(tag:Double, e:Double)
+	Select T(tag)
+	Case CONS_TAG 
+		Return cons(eval(car(tag), e), evlis(cdr(tag), e))
+	Case ATOM_TAG 
+		Return assoc(tag, e)
+	Default 
+		Return nil_val
+	End Select
+End Function
+
+' Lisp primitives:
+'   (eval x)            return evaluated x (such as when x was quoted)
+'   (quote x)           special form, returns x unevaluated "as is"
+'   (cons x y)          construct pair (x . y)
+'   (car p)             car of pair p
+'   (cdr p)             cdr of pair p
+'   (add n1 n2 ... nk)  sum of n1 to nk
+'   (sub n1 n2 ... nk)  n1 minus sum of n2 to nk
+'   (mul n1 n2 ... nk)  product of n1 to nk
+'   (div n1 n2 ... nk)  n1 divided by the product of n2 to nk
+'   (int n)             integer part of n
+'   (< n1 n2)           #t if n1<n2, otherwise ()
+'   (eq? x y)           #t if x equals y, otherwise ()
+'   (not x)             #t if x is (), otherwise ()
+'   (or x1 x2 ... xk)   first x that is not (), otherwise ()
+'   (and x1 x2 ... xk)  last x if all x are not (), otherwise ()
+'   (cond (x1 y1)
+'         (x2 y2)
+'         ...
+'         (xk yk))      the first yi for which xi evaluates to non-()
+'   (if x y z)          if x is non-() then y else z
+'   (let* (v1 x1)
+'         (v2 x2)
+'         ...
+'         y)            sequentially binds each variable v1 to xi to evaluate y
+'   (lambda v x)        construct a closure
+'   (define v x)        define a named value globally
 
 Function debugPrint(x:Double)
 	Local val:ULong
@@ -208,7 +271,6 @@ Function debugPrint(x:Double)
 	Print labelBuffer
 	Print bitBuffer
 	
-	
 	Print "TinyLisp Representation"
 	Local tagVal:ULong = val Shr 48
 	
@@ -217,9 +279,9 @@ Function debugPrint(x:Double)
 	Print "*** end debug ***~n"
 End Function
 
-For Local test:String = EachIn ["foo", "foo", "foo"]
-	atom(test)
-Next
+Function eval:Double(a:Double, b:Double)
+	Print "Hello world!"
+End Function
 
 Function dump()
 	GCSuspend()
@@ -237,5 +299,3 @@ Function dump()
 	Print buffer
 	GCResume()
 End Function
-
-dump()
