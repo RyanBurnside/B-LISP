@@ -280,7 +280,7 @@ Function debugPrint(x:Double)
 End Function
 
 Function eval:Double(a:Double, b:Double)
-	Print "Hello world!"
+	Print "***Eval not yet implemented, giving wrong answer!***"
 End Function
 
 Function dump()
