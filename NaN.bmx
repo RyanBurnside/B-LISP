@@ -7,11 +7,11 @@ Import text.format
 ' We want to force the Lisp expression (double) into being misread as an unsighed int
 ' this allows us to shift the bits and find the tag it was encoded with
 Function T:ULong(x:Double) Inline
-	GCSuspend()
-	Local ulong_ptr:ULong Ptr = Varptr x
-	Local result:ULong = ulong_ptr[0] Shr 48
-	GCResume()
-	Return result
+    GCSuspend()
+    Local ulong_ptr:ULong Ptr = Varptr x
+    Local result:ULong = ulong_ptr[0] Shr 48
+    GCResume()
+    Return result
 End Function
 
 Global N:UInt = 1024 ' number of Lisp objects (doubles) to store for the VM
@@ -22,11 +22,11 @@ Global sp:ULong = N ' stack pointer
 Global cell:Double[N]
 
 Function reset()
-	Print "B-LISP: Resetting heap and stack,"
-	Print "B-LIsp: Using " + String(N) + " Cells."
-	hp = 0 ' heap pointer
-	sp = N ' stack pointer
-	cell = New Double[N]
+    Print "B-LISP: Resetting heap and stack,"
+    Print "B-LIsp: Using " + String(N) + " Cells."
+    hp = 0 ' heap pointer
+    sp = N ' stack pointer
+    cell = New Double[N]
 End Function
 
 ' Reset
@@ -40,14 +40,14 @@ Const CLOS_TAG:ULong = $7ffb  'closure
 Const NIL_TAG:ULong  = $7ffc  'duh
 
 Function tagToString:String(tag:ULong)
-	Select tag
-		Case ATOM_TAG Return "ATOM"
-		Case PRIM_TAG Return "PRIMITIVE"
-		Case CONS_TAG Return "CONS"
-		Case CLOS_TAG Return "CLOSURE"
-		Case NIL_TAG Return "NIL"
-		Default Return "UNKNOWN TYPE"
-	End Select
+    Select tag
+    Case ATOM_TAG Return "ATOM"
+    Case PRIM_TAG Return "PRIMITIVE"
+    Case CONS_TAG Return "CONS"
+    Case CLOS_TAG Return "CLOSURE"
+    Case NIL_TAG Return "NIL"
+    Default Return "UNKNOWN TYPE"
+    End Select
 End Function
 
 Global nil_val:Double ' Ask Pete about these...
@@ -58,136 +58,136 @@ Global env_val:Double
 ''' NaN-boxing specific functions:
 '''    box(t,i): returns a New NaN-boxed Double with tag t And ordinal i
 Function box:Double(tag:ULong, i:ULong) Inline
-	Local temp:Double
-	GCSuspend()
-	Local u_longptr:ULong Ptr = Varptr temp
-	u_longptr[0] = tag Shl 48 | i
-	GCResume()
-	Return temp
+    Local temp:Double
+    GCSuspend()
+    Local u_longptr:ULong Ptr = Varptr temp
+    u_longptr[0] = tag Shl 48 | i
+    GCResume()
+    Return temp
 End Function
 
 ''' ord(x): returns the ordinal of the NaN-boxed Double x
 ''' not representative of *actual* value in base 10 
 Function ord:ULong(n:Double) Inline
-	Local temp:ULong	
-	GCSuspend()
-	Local u_longptr:ULong Ptr = Varptr n
-	temp = u_longptr[0] & $ffffffffffff:ULong
-	GCResume()
-	Return temp
+    Local temp:ULong    
+    GCSuspend()
+    Local u_longptr:ULong Ptr = Varptr n
+    temp = u_longptr[0] & $ffffffffffff:ULong
+    GCResume()
+    Return temp
 End Function 
 
 ' Does nothing, but could be extended to check for NaN
 Function num:Double(n:Double) Inline
-	Return n
+    Return n
 End Function
 
 ' Returns nonzero if x equals y
 Function equ:ULong(x:Double, y:Double) Inline
-	Local temp:ULong
-	GCSuspend()
-	Local u_longptr_x:ULong Ptr = Varptr x
-	Local u_longptr_y:ULong Ptr = Varptr y
-	temp = (u_longptr_x[0] = u_longptr_y[0])
-	GCResume()
-	Return temp
+    Local temp:ULong
+    GCSuspend()
+    Local u_longptr_x:ULong Ptr = Varptr x
+    Local u_longptr_y:ULong Ptr = Varptr y
+    temp = (u_longptr_x[0] = u_longptr_y[0])
+    GCResume()
+    Return temp
 EndFunction
 
 ' interning of atom names (Lisp symbols), returns a unique NaN-boxed ATOM
 Function atom:Double(s:String)
-	Local i:ULong = 0
-	GCSuspend()
-	Local charPtr:Byte Ptr = cell
-	Local embeddedStr:String = String.FromCString(charPtr + i)
-	
-	While i < hp And embeddedStr <> s
-		embeddedStr = String.FromCString(charPtr + i)
-		i :+ embeddedStr.Length + 1 ' we will store as null terminated C string
-	Wend
-	
-	If i = hp
-		Local s_size:Size_T = s.Length + 1
-		hp :+ s_size
-		s.ToUTF8StringBuffer(charPtr + i, s_size)
-		Print s
-		If hp > (sp Shl 3)
-			Print "B-LISP: Critical Error! Heap pointer greater than stack pointer!"
-			reset()
-		EndIf
-	EndIf
-	GCResume()
-	Return box(ATOM_TAG, i)
+    Local i:ULong = 0
+    GCSuspend()
+    Local charPtr:Byte Ptr = cell
+    Local embeddedStr:String = String.FromCString(charPtr + i)
+    
+    While i < hp And embeddedStr <> s
+        embeddedStr = String.FromCString(charPtr + i)
+        i :+ embeddedStr.Length + 1 ' we will store as null terminated C string
+    Wend
+    
+    If i = hp
+        Local s_size:Size_T = s.Length + 1
+        hp :+ s_size
+        s.ToUTF8StringBuffer(charPtr + i, s_size)
+        Print s
+        If hp > (sp Shl 3)
+            Print "B-LISP: Critical Error! Heap pointer greater than stack pointer!"
+            reset()
+        EndIf
+    EndIf
+    GCResume()
+    Return box(ATOM_TAG, i)
 End Function
 
 ' construct pair (x . y) returns a NaN-boxed CONS_TAG
 Function cons:Double(x:Double, y:Double)
-	sp :- 1
-	cell[sp] = x
-	sp :- 1
-	cell[sp] = y
-	If (hp > sp Shl 3) Then reset()
-	Return box(CONS_TAG, sp)
+    sp :- 1
+    cell[sp] = x
+    sp :- 1
+    cell[sp] = y
+    If (hp > sp Shl 3) Then reset()
+    Return box(CONS_TAG, sp)
 End Function
 
 ' return the car of the pair or ERR if not a pair
 Function car:Double(p:Double) ' check
-	If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
-		Return cell[ord(p) + 1]
-	Else
-		Return err_val
-	End If 
+    If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
+        Return cell[ord(p) + 1]
+    Else
+        Return err_val
+    End If 
 End Function
 
 ' return the cdr of the pair or ERR if not a pair
 Function cdr:Double(p:Double) ' check
-	If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
-		Return cell[ord(p)]
-	Else
-		Return err_val
-	End If 
+    If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
+        Return cell[ord(p)]
+    Else
+        Return err_val
+    End If 
 End Function
 
 ' construct a pair to add to environment e, returns the list ((v . x) . e)
 Function pair:Double(v:Double, x:Double, e:Double) ' check
-	Return cons(cons(v, x), e)
+    Return cons(cons(v, x), e)
 End Function
 
 ' construct a closure, returns a NaN-boxed CLOS_TAG
 Function closure:Double(v:Double, x:Double, e:Double) ' check
-	'  return box(CLOS,ord(pair(v,x,equ(e,env) ? nil : e))); }
-	Local env:Double
-	If equ(e, env_val) Then env = nil_val Else env = e
-	Return box(CLOS_TAG, ord(pair(v, x, env)))
+    '  return box(CLOS,ord(pair(v,x,equ(e,env) ? nil : e))); }
+    Local env:Double
+    If equ(e, env_val) Then env = nil_val Else env = e
+    Return box(CLOS_TAG, ord(pair(v, x, env)))
 End Function
 
 ' look up a symbol in an environment, return its value or err if not found
 Function assoc:Double(v:Double, e:Double)
-	While T(e) = CONS_TAG And Not equ(v, car(car(e)))
-		e = cdr(e)
-	Wend
-	If T(e) = CONS_TAG Then Return cdr(car(e)) Else Return err_val
+    While T(e) = CONS_TAG And Not equ(v, car(car(e)))
+        e = cdr(e)
+    Wend
+    If T(e) = CONS_TAG Then Return cdr(car(e)) Else Return err_val
 End Function
 
 ' lispNot(x) is nonzero if x is the lisp () empty list
 Function lispNot:ULong(x:Double)
-	Return T(x) = NIL_TAG
+    Return T(x) = NIL_TAG
 End Function
 
 ' let(x) is nonzero if x is a Lisp let/let* pair
 Function let:ULong(x:Double)
-	Return T(x) <> NIL_TAG  And (Not lispNot(cdr(x)))
+    Return T(x) <> NIL_TAG  And (Not lispNot(cdr(x)))
 End Function
 
 ' return a new list of evaluated Lisp expresions t in the environment e
 Function evlis:Double(tag:Double, e:Double)
-	Select T(tag)
-	Case CONS_TAG 
-		Return cons(eval(car(tag), e), evlis(cdr(tag), e))
-	Case ATOM_TAG 
-		Return assoc(tag, e)
-	Default 
-		Return nil_val
-	End Select
+    Select T(tag)
+    Case CONS_TAG 
+        Return cons(eval(car(tag), e), evlis(cdr(tag), e))
+    Case ATOM_TAG 
+        Return assoc(tag, e)
+    Default 
+        Return nil_val
+    End Select
 End Function
 
 ' Lisp primitives:
@@ -219,153 +219,152 @@ End Function
 '   (define v x)        define a named value globally
 
 Function f_eval:Double(tt:Double, e:Double)
-	Return eval(car(evlis(tt, e)), e)
+    Return eval(car(evlis(tt, e)), e)
 End Function
 
 Function f_quote:Double(tt:Double, _:Double)
-	Return car(tt)
+    Return car(tt)
 End Function
 
 Function f_cons:Double(tt:Double, e:Double)
-	Return cons(car(tt), car(cdr(tt)))
+    Return cons(car(tt), car(cdr(tt)))
 End Function
 
 Function f_car:Double(tt:Double, e:Double)
-	Return car(car(evlis(tt, e)))
+    Return car(car(evlis(tt, e)))
 End Function
 
 Function f_cdr:Double(tt:Double, e:Double)
-	Return cdr(car(evlis(tt, e)))
+    Return cdr(car(evlis(tt, e)))
 End Function
 
 Function f_add:Double(tt:Double, e:Double)
-	tt = evlis(tt, e)
-	If T(tt) = NIL_TAG Then Return num(0)
-	Local n:Double = 0
-	While Not lispNot(tt)
-		n :+ car(tt)
-		tt = cdr(tt)
-	Wend
-	Return num(n)
+    tt = evlis(tt, e)
+    If T(tt) = NIL_TAG Then Return num(0)
+    Local n:Double = 0
+    While Not lispNot(tt)
+        n :+ car(tt)
+        tt = cdr(tt)
+    Wend
+    Return num(n)
 End Function
 
 Function f_sub:Double(tt:Double, e:Double)
-	'tt = evlis(tt, e)
-	Local n:Double = car(tt)
-	If T(tt) = NIL_TAG Then Return err_val
-	If T(cdr(tt)) = NIL_TAG Then Return num(-n)
-	While Not lispNot(tt)
-		tt = cdr(tt)
-		n :- car(tt)
-	Wend
-	Return num(n)
+    'tt = evlis(tt, e)
+    Local n:Double = car(tt)
+    If T(tt) = NIL_TAG Then Return err_val
+    If T(cdr(tt)) = NIL_TAG Then Return num(-n)
+    While Not lispNot(tt)
+        tt = cdr(tt)
+        n :- car(tt)
+    Wend
+    Return num(n)
 End Function
 
 Function f_mul:Double(tt:Double, e:Double)
-	tt = evlis(tt, e)
-	If T(tt) = NIL_TAG Then Return num(1)
-	Local n:Double = 1
-	While Not lispNot(tt)
-		n :* car(tt)
-		tt = cdr(tt)
-	Wend
-	Return num(n)
+    tt = evlis(tt, e)
+    If T(tt) = NIL_TAG Then Return num(1)
+    Local n:Double = 1
+    While Not lispNot(tt)
+        n :* car(tt)
+        tt = cdr(tt)
+    Wend
+    Return num(n)
 End Function
 
 Function f_div:Double(tt:Double, e:Double)
-	tt = evlis(tt, e)
-	Local n:Double = car(tt)
-	If T(tt) = NIL_TAG Then Return err_val
-	If T(cdr(tt)) = NIL_TAG Then Return num(1.0 / n)
-	Print "GOT here!"
-	While Not lispNot(tt)
-	Print ">" + n
-		n :/ car(tt)
-		tt = cdr(tt)
-	Wend
-	Return num(n)
+    tt = evlis(tt, e)
+    Local n:Double = car(tt)
+    If T(tt) = NIL_TAG Then Return err_val
+    If T(cdr(tt)) = NIL_TAG Then Return num(1.0 / n)
+    Print "GOT here!"
+    While Not lispNot(tt)
+    Print ">" + n
+        n :/ car(tt)
+        tt = cdr(tt)
+    Wend
+    Return num(n)
 End Function
 
 Function debugPrint(x:Double)
-	Local val:ULong
-	Local mask:ULong = $ff
-	
-	GCSuspend()
-	Local u_longptr:ULong Ptr = Varptr x
-	val = u_longptr[0]
-	GCResume()
-	
-	mask :Shl 56
-	
-	Print "*** Debug Print ***"
-	Print "Analyzed double"
-	Print "Original double value: " + String.FromDouble(x)
-	Print "Sign bit:" + String.FromLong(val Shr 63)
-	Print "Exponent: $" + Hex((val Shr 52) & $7FF)[5..]
-	Print "Mantissa: $" + LongHex(val & $FFFFFFFFFFFFF:ULong)[3..]
-	If x = x Then Print "NaN: no" Else Print "NaN: yes" 
-	
-	Print "Raw Bytes From MSB to LSB"
-	Local numBytes:Int = SizeOf(val)
-	Local strBuff:String[] = New String[numBytes]
-	For Local i:Int = 0 Until numBytes
-		strBuff[i] = Hex((val & mask) Shr ((numBytes - 1 - i) * 8))[6..]
+    Local val:ULong
+    Local mask:ULong = $ff
+    
+    GCSuspend()
+    Local u_longptr:ULong Ptr = Varptr x
+    val = u_longptr[0]
+    GCResume()
+    
+    mask :Shl 56
+    
+    Print "*** Debug Print ***"
+    Print "Analyzed double"
+    Print "Original double value: " + String.FromDouble(x)
+    Print "Sign bit:" + String.FromLong(val Shr 63)
+    Print "Exponent: $" + Hex((val Shr 52) & $7FF)[5..]
+    Print "Mantissa: $" + LongHex(val & $FFFFFFFFFFFFF:ULong)[3..]
+    If x = x Then Print "NaN: no" Else Print "NaN: yes" 
+    
+    Print "Raw Bytes From MSB to LSB"
+    Local numBytes:Int = SizeOf(val)
+    Local strBuff:String[] = New String[numBytes]
+    For Local i:Int = 0 Until numBytes
+        strBuff[i] = Hex((val & mask) Shr ((numBytes - 1 - i) * 8))[6..]
         mask :Shr 8;
-	Next 
-	Print "$"+" ".Join(strBuff)
-	
-	Print "Individual Bits"
-	mask = ULong(1) Shl 63
-	Local bitBuffer:String = ""
-	Local labelBuffer:String = ""
-	For Local i:Int = 0 Until numBytes * 8
-		If (i = 1 Or i = 12) ' boundary spaces
-			bitBuffer :+ " "
-			labelBuffer :+ " "
-		End If
-		
-		If (val & mask) bitBuffer :+ "1" Else bitBuffer :+ "0"
-		mask :Shr 1
-		
-		' label buffer updates
-		If i = 0 
+    Next 
+    Print "$"+" ".Join(strBuff)
+    
+    Print "Individual Bits"
+    mask = ULong(1) Shl 63
+    Local bitBuffer:String = ""
+    Local labelBuffer:String = ""
+    For Local i:Int = 0 Until numBytes * 8
+        If (i = 1 Or i = 12) ' boundary spaces
+            bitBuffer :+ " "
+            labelBuffer :+ " "
+        End If
+        
+        If (val & mask) bitBuffer :+ "1" Else bitBuffer :+ "0"
+        mask :Shr 1
+        
+        ' label buffer updates
+        If i = 0 
             labelBuffer :+ "s"
         Else If i > 0 And i < 12
             labelBuffer :+ "e"
         Else
             labelBuffer :+ "m"
         End If
-		
-	Next
-	Print labelBuffer
-	Print bitBuffer
-	
-	Print "TinyLisp Representation"
-	Local tagVal:ULong = val Shr 48
-	
-	Print "Tag Bits: $" + Hex(tagVal)[4..] + " (" + tagToString(tagVal) + ")"
-	Print "Storage Bits: $" + LongHex(val & $FFFFFFFFFFFF:ULong)
-	Print "*** end debug ***~n"
+        
+    Next
+    Print labelBuffer
+    Print bitBuffer
+    
+    Print "TinyLisp Representation"
+    Local tagVal:ULong = val Shr 48
+    
+    Print "Tag Bits: $" + Hex(tagVal)[4..] + " (" + tagToString(tagVal) + ")"
+    Print "Storage Bits: $" + LongHex(val & $FFFFFFFFFFFF:ULong)
+    Print "*** end debug ***~n"
 End Function
 
 Function eval:Double(a:Double, b:Double)
-	Print "***Eval not yet implemented, giving wrong answer!***"
-	
+    Print "***Eval not yet implemented, giving wrong answer!***"
 End Function
 
 Function dump()
-	GCSuspend()
-	Local p:Byte Ptr = cell
-	Local buffer:String = ""
-	For Local i:Int = 0 Until cell.Length * 8
-		If i Mod 40 = 0 Then buffer :+ "~n"
-		If p[0] <> 0 
-			buffer :+ Chr(p[0]) + " "
-		Else 
-			buffer :+ ". "
-		End If
-		p :+ 1
-	Next
-	Print buffer
-	GCResume()
+    GCSuspend()
+    Local p:Byte Ptr = cell
+    Local buffer:String = ""
+    For Local i:Int = 0 Until cell.Length * 8
+        If i Mod 40 = 0 Then buffer :+ "~n"
+        If p[0] <> 0 
+            buffer :+ Chr(p[0]) + " "
+        Else 
+            buffer :+ ". "
+        End If
+        p :+ 1
+    Next
+    Print buffer
+    GCResume()
 End Function
