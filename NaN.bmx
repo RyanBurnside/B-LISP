@@ -72,7 +72,7 @@ Function ord:ULong(n:Double) Inline
 	Local temp:ULong	
 	GCSuspend()
 	Local u_longptr:ULong Ptr = Varptr n
-	temp = u_longptr[0] & $ffffffffffff
+	temp = u_longptr[0] & $ffffffffffff:ULong
 	GCResume()
 	Return temp
 End Function 
@@ -178,6 +178,7 @@ Function let:ULong(x:Double)
 	Return T(x) <> NIL_TAG  And (Not lispNot(cdr(x)))
 End Function
 
+' return a new list of evaluated Lisp expresions t in the environment e
 Function evlis:Double(tag:Double, e:Double)
 	Select T(tag)
 	Case CONS_TAG 
@@ -216,6 +217,74 @@ End Function
 '         y)            sequentially binds each variable v1 to xi to evaluate y
 '   (lambda v x)        construct a closure
 '   (define v x)        define a named value globally
+
+Function f_eval:Double(tt:Double, e:Double)
+	Return eval(car(evlis(tt, e)), e)
+End Function
+
+Function f_quote:Double(tt:Double, _:Double)
+	Return car(tt)
+End Function
+
+Function f_cons:Double(tt:Double, e:Double)
+	Return cons(car(tt), car(cdr(tt)))
+End Function
+
+Function f_car:Double(tt:Double, e:Double)
+	Return car(car(evlis(tt, e)))
+End Function
+
+Function f_cdr:Double(tt:Double, e:Double)
+	Return cdr(car(evlis(tt, e)))
+End Function
+
+Function f_add:Double(tt:Double, e:Double)
+	tt = evlis(tt, e)
+	If T(tt) = NIL_TAG Then Return num(0)
+	Local n:Double = 0
+	While Not lispNot(tt)
+		n :+ car(tt)
+		tt = cdr(tt)
+	Wend
+	Return num(n)
+End Function
+
+Function f_sub:Double(tt:Double, e:Double)
+	'tt = evlis(tt, e)
+	Local n:Double = car(tt)
+	If T(tt) = NIL_TAG Then Return err_val
+	If T(cdr(tt)) = NIL_TAG Then Return num(-n)
+	While Not lispNot(tt)
+		tt = cdr(tt)
+		n :- car(tt)
+	Wend
+	Return num(n)
+End Function
+
+Function f_mul:Double(tt:Double, e:Double)
+	tt = evlis(tt, e)
+	If T(tt) = NIL_TAG Then Return num(1)
+	Local n:Double = 1
+	While Not lispNot(tt)
+		n :* car(tt)
+		tt = cdr(tt)
+	Wend
+	Return num(n)
+End Function
+
+Function f_div:Double(tt:Double, e:Double)
+	tt = evlis(tt, e)
+	Local n:Double = car(tt)
+	If T(tt) = NIL_TAG Then Return err_val
+	If T(cdr(tt)) = NIL_TAG Then Return num(1.0 / n)
+	Print "GOT here!"
+	While Not lispNot(tt)
+	Print ">" + n
+		n :/ car(tt)
+		tt = cdr(tt)
+	Wend
+	Return num(n)
+End Function
 
 Function debugPrint(x:Double)
 	Local val:ULong
@@ -281,6 +350,7 @@ End Function
 
 Function eval:Double(a:Double, b:Double)
 	Print "***Eval not yet implemented, giving wrong answer!***"
+	
 End Function
 
 Function dump()
