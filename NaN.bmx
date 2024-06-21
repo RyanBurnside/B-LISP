@@ -277,7 +277,6 @@ Function f_div:Double(tt:Double, e:Double)
     Local n:Double = car(tt)
     If T(tt) = NIL_TAG Then Return err_val
     If T(cdr(tt)) = NIL_TAG Then Return num(1.0 / n)
-    Print "GOT here!"
     While Not lispNot(tt)
     Print ">" + n
         n :/ car(tt)
@@ -285,6 +284,49 @@ Function f_div:Double(tt:Double, e:Double)
     Wend
     Return num(n)
 End Function
+
+Function f_int:Double(t:Double, e:Double)
+	Local n:Double = car(evlis(t,e))
+	If n < 1e16 And n > 1e-16
+		Return Long(n)
+    End If
+    Return n
+End Function
+
+Function f_lt:Double(t:Double, e:Double)
+	t = evlis(t, e)
+	If car(t) - car(cdr(t)) < 0
+		Return tru_val
+	End If
+	Return nil_val
+End Function
+
+Function f_eq:Double(t:Double, e:Double)
+	t = evlis(t, e)
+	If equ(car(t), car(cdr(t)))
+		Return tru_val
+	End If
+	Return nil_val
+End Function
+
+Function f_not:Double(t:Double, e:Double)
+	If lispNot(car(evlis(t, e)))
+		Return tru_val
+	End If
+	Return nil_val
+End Function
+
+Function f_or:Double(tt:Double, e:Double)
+	Local x:Double = nil_val
+	While T(tt) <> NIL_TAG
+		x = eval(car(tt), e)
+		If Not lispNot(x) Then Return x
+		tt = cdr(tt) 
+	Wend
+	Return x	
+End Function
+
+
 
 Function debugPrint(x:Double)
     Local val:ULong
