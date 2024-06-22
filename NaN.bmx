@@ -133,18 +133,16 @@ End Function
 Function car:Double(p:Double) ' check
     If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
         Return cell[ord(p) + 1]
-    Else
-        Return err_val
-    End If 
+    End If
+    Return err_val 
 End Function
 
 ' return the cdr of the pair or ERR if not a pair
 Function cdr:Double(p:Double) ' check
     If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
         Return cell[ord(p)]
-    Else
-        Return err_val
-    End If 
+    End If
+    Return err_val 
 End Function
 
 ' construct a pair to add to environment e, returns the list ((v . x) . e)
@@ -286,53 +284,73 @@ Function f_div:Double(tt:Double, e:Double)
 End Function
 
 Function f_int:Double(t:Double, e:Double)
-	Local n:Double = car(evlis(t,e))
-	If n < 1e16 And n > 1e-16 Then Return Long(n)
+    Local n:Double = car(evlis(t,e))
+    If n < 1e16 And n > 1e-16 Then Return Long(n)
     Return n
 End Function
 
 Function f_lt:Double(t:Double, e:Double)
-	t = evlis(t, e)
-	If car(t) - car(cdr(t)) < 0 Then Return tru_val
-	Return nil_val
+    t = evlis(t, e)
+    If car(t) - car(cdr(t)) < 0 Then Return tru_val
+    Return nil_val
 End Function
 
 Function f_eq:Double(t:Double, e:Double)
-	t = evlis(t, e)
-	If equ(car(t), car(cdr(t))) Then Return tru_val
-	Return nil_val
+    t = evlis(t, e)
+    If equ(car(t), car(cdr(t))) Then Return tru_val
+    Return nil_val
 End Function
 
 Function f_not:Double(t:Double, e:Double)
-	If lispNot(car(evlis(t, e))) Then Return tru_val
-	Return nil_val
+    If lispNot(car(evlis(t, e))) Then Return tru_val
+    Return nil_val
 End Function
 
 Function f_or:Double(tt:Double, e:Double)
-	Local x:Double = nil_val
-	While T(tt) <> NIL_TAG
-		x = eval(car(tt), e)
-		If Not lispNot(x) Then Return x
-		tt = cdr(tt) 
-	Wend
-	Return x	
+    Local x:Double = nil_val
+    While T(tt) <> NIL_TAG
+        x = eval(car(tt), e)
+        If Not lispNot(x) Then Return x
+        tt = cdr(tt) 
+    Wend
+    Return x    
 End Function
 
 Function f_and:Double(tt:Double, e:Double) ' double check
-	Local x:Double = nil_val
-	While T(tt) <> NIL_TAG
-		x = eval(car(tt), e)
-		If lispNot(x) Then Exit
-		tt = cdr(tt)
-	Wend
-	Return x
+    Local x:Double = nil_val
+    While T(tt) <> NIL_TAG
+        x = eval(car(tt), e)
+        If lispNot(x) Then Exit
+        tt = cdr(tt)
+    Wend
+    Return x
 End Function
 
 Function f_cond:Double(tt:Double, e:Double) ' double check
-	While T(tt) <> NIL_TAG And lispNot(eval(car(car(tt)), e))
-		tt = cdr(tt)
-	Wend
-	Return eval(car(cdr(car(tt))), e)
+    While T(tt) <> NIL_TAG And lispNot(eval(car(car(tt)), e))
+        tt = cdr(tt)
+    Wend
+    Return eval(car(cdr(car(tt))), e)
+End Function
+
+Function f_if:Double(tt:Double, e:Double) ' double check
+    Local pred:Double = lispNot(eval(car(tt), e))
+    Local answer:Double = tt
+    If pred Then answer = cdr(tt)
+    Return eval(car(cdr(answer)), e)
+End Function
+
+Function f_leta:Double(tt:Double, e:Double)
+    Print "Not yet implemented"
+End Function
+
+Function f_lambda:Double(tt:Double, e:Double) ' double check
+    Return closure(car(tt), car(cdr(tt)), e)
+End Function
+
+Function f_define:Double(tt:Double, e:Double)
+    env_val = pair(car(tt), eval(car(cdr(tt)), e), env_val)
+    Return car(tt)
 End Function
 
 Function debugPrint(x:Double)
