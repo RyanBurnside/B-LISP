@@ -342,10 +342,10 @@ End Function
 
 Function f_leta:Double(tt:Double, e:Double)
     While let(tt)
-		e = pair(car(car(tt)), eval(car(cdr(car(tt))), e), e)
-		tt = cdr(tt)
-	Wend
-	Return eval(car(tt), e)
+        e = pair(car(car(tt)), eval(car(cdr(car(tt))), e), e)
+        tt = cdr(tt)
+    Wend
+    Return eval(car(tt), e)
 End Function
 
 Function f_lambda:Double(tt:Double, e:Double) ' double check
@@ -359,12 +359,12 @@ End Function
 
 ' table of Lisp primitives, each has a name s And a Function pointer f
 Type fnPointer
-	Field s:String
-	Field f:Double(tt:Double, e:Double)
-	Method New (s:String, f:Double(tt:Double, e:Double))
-		Self.s = s
-		Self.f = f
-	End Method
+    Field s:String
+    Field f:Double(tt:Double, e:Double)
+    Method New (s:String, f:Double(tt:Double, e:Double))
+        Self.s = s
+        Self.f = f
+    End Method
 End Type
 
 Global prim:fnPointer[] = [ ..
@@ -392,33 +392,33 @@ New fnPointer("define", f_define)]
 ' create environment by extending e with the variables v bount to values t
 
 Function bind:Double(v:Double, tt:Double, e:Double)
-	Select T(v)
-	Case NIL_TAG Return e
-	Case CONS_TAG Return bind(cdr(v), cdr(tt), pair(car(v), car(tt), e))
-	Default Return pair(v, tt, e)
-	End Select
+    Select T(v)
+    Case NIL_TAG Return e
+    Case CONS_TAG Return bind(cdr(v), cdr(tt), pair(car(v), car(tt), e))
+    Default Return pair(v, tt, e)
+    End Select
 End Function
 
 Function reduce:Double(f:Double, tt:Double, e:Double)
-	Local en:Double = cdr(f)
-	If lispNot(cdr(f)) Then en = env_val
-	Return eval(cdr(car(f)), bind(car(car(f)), evlis(tt, e), en))
+    Local en:Double = cdr(f)
+    If lispNot(cdr(f)) Then en = env_val
+    Return eval(cdr(car(f)), bind(car(car(f)), evlis(tt, e), en))
 End Function 
 
 Function Apply:Double(f:Double, tt:Double, e:Double)
-	Select T(f)
-	Case PRIM_TAG Return prim[ord(f)].f(tt, e)
-	Case CLOS_TAG Return reduce(f, tt, e)
-	Default Return err_val
-	End Select
+    Select T(f)
+    Case PRIM_TAG Return prim[ord(f)].f(tt, e)
+    Case CLOS_TAG Return reduce(f, tt, e)
+    Default Return err_val
+    End Select
 End Function
 
 Function eval:Double(x:Double, e:Double)
-	Select T(x)
-	Case ATOM_TAG Return assoc(x, e)
-	Case CONS_TAG Return Apply(eval(car(x), e), cdr(x), e)
-	Default Return x
-	End Select
+    Select T(x)
+    Case ATOM_TAG Return assoc(x, e)
+    Case CONS_TAG Return Apply(eval(car(x), e), cdr(x), e)
+    Default Return x
+    End Select
 End Function
 
 Function debugPrint(x:Double)
