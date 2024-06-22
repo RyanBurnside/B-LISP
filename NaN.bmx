@@ -287,32 +287,24 @@ End Function
 
 Function f_int:Double(t:Double, e:Double)
 	Local n:Double = car(evlis(t,e))
-	If n < 1e16 And n > 1e-16
-		Return Long(n)
-    End If
+	If n < 1e16 And n > 1e-16 Then Return Long(n)
     Return n
 End Function
 
 Function f_lt:Double(t:Double, e:Double)
 	t = evlis(t, e)
-	If car(t) - car(cdr(t)) < 0
-		Return tru_val
-	End If
+	If car(t) - car(cdr(t)) < 0 Then Return tru_val
 	Return nil_val
 End Function
 
 Function f_eq:Double(t:Double, e:Double)
 	t = evlis(t, e)
-	If equ(car(t), car(cdr(t)))
-		Return tru_val
-	End If
+	If equ(car(t), car(cdr(t))) Then Return tru_val
 	Return nil_val
 End Function
 
 Function f_not:Double(t:Double, e:Double)
-	If lispNot(car(evlis(t, e)))
-		Return tru_val
-	End If
+	If lispNot(car(evlis(t, e))) Then Return tru_val
 	Return nil_val
 End Function
 
@@ -326,7 +318,22 @@ Function f_or:Double(tt:Double, e:Double)
 	Return x	
 End Function
 
+Function f_and:Double(tt:Double, e:Double) ' double check
+	Local x:Double = nil_val
+	While T(tt) <> NIL_TAG
+		x = eval(car(tt), e)
+		If lispNot(x) Then Exit
+		tt = cdr(tt)
+	Wend
+	Return x
+End Function
 
+Function f_cond:Double(tt:Double, e:Double) ' double check
+	While T(tt) <> NIL_TAG And lispNot(eval(car(car(tt)), e))
+		tt = cdr(tt)
+	Wend
+	Return eval(car(cdr(car(tt))), e)
+End Function
 
 Function debugPrint(x:Double)
     Local val:ULong
