@@ -421,6 +421,26 @@ Function eval:Double(x:Double, e:Double)
     End Select
 End Function
 
+
+Function main:Int()
+	Local i:ULong
+	Local x:Double
+	Print "Starting B-LISP"
+	nil_val = box(NIL_TAG, 0)
+	err_val = atom("ERR")
+	tru_val = atom("#t")
+	env_val = pair(tru_val, tru_val, nil_val)
+	For Local i:Int = 0 Until prim.Length 
+		env_val = pair(atom(prim[i].s), box(PRIM_TAG, i), env_val)
+	Next
+	x = eval(cons(atom("-"), cons(num(64), cons(num(36), nil_val))), env_val)
+	debugPrint(x)
+	Return 0
+End Function
+
+main()
+
+
 Function debugPrint(x:Double)
     Local val:ULong
     Local mask:ULong = $ff
@@ -481,10 +501,6 @@ Function debugPrint(x:Double)
     Print "Tag Bits: $" + Hex(tagVal)[4..] + " (" + tagToString(tagVal) + ")"
     Print "Storage Bits: $" + LongHex(val & $FFFFFFFFFFFF:ULong)
     Print "*** end debug ***~n"
-End Function
-
-Function eval:Double(a:Double, b:Double)
-    Print "***Eval not yet implemented, giving wrong answer!***"
 End Function
 
 Function dump()
