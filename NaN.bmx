@@ -242,19 +242,20 @@ Function f_add:Double(tt:Double, e:Double)
     Local n:Double = 0
     While Not lispNot(tt)
         n :+ car(tt)
-        tt = cdr(tt)
+		tt = cdr(tt)
     Wend
     Return num(n)
 End Function
 
 Function f_sub:Double(tt:Double, e:Double)
-    'tt = evlis(tt, e)
-    Local n:Double = car(tt)
+    tt = evlis(tt, e)
     If T(tt) = NIL_TAG Then Return err_val
+    Local n:Double = car(tt)
     If T(cdr(tt)) = NIL_TAG Then Return num(-n)
+	tt = cdr(tt)
     While Not lispNot(tt)
-        tt = cdr(tt)
         n :- car(tt)
+	    tt = cdr(tt)
     Wend
     Return num(n)
 End Function
@@ -275,6 +276,7 @@ Function f_div:Double(tt:Double, e:Double)
     Local n:Double = car(tt)
     If T(tt) = NIL_TAG Then Return err_val
     If T(cdr(tt)) = NIL_TAG Then Return num(1.0 / n)
+	tt = cdr(tt)
     While Not lispNot(tt)
     Print ">" + n
         n :/ car(tt)
@@ -424,7 +426,7 @@ End Function
 
 Function main:Int()
 	Local i:ULong
-	Local x:Double
+	Local v:Double
 	Print "Starting B-LISP"
 	nil_val = box(NIL_TAG, 0)
 	err_val = atom("ERR")
@@ -433,13 +435,14 @@ Function main:Int()
 	For Local i:Int = 0 Until prim.Length 
 		env_val = pair(atom(prim[i].s), box(PRIM_TAG, i), env_val)
 	Next
-	x = eval(cons(atom("-"), cons(num(64), cons(num(36), nil_val))), env_val)
-	debugPrint(x)
+	Local expr:Double
+	expr = eval(cons(atom("+"), cons(num(64), cons(num(72), nil_val))), env_val)
+	v = f_sub(cons(num(-32), nil_val), env_val)
+	debugPrint(v)
 	Return 0
 End Function
 
 main()
-
 
 Function debugPrint(x:Double)
     Local val:ULong
