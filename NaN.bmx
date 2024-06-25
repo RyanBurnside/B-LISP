@@ -92,26 +92,22 @@ EndFunction
 Function atom:Double(s:String)
     Local i:ULong = 0
     GCSuspend()
-    Local charPtr:Byte Ptr = cell
-    Local embeddedStr:String = String.FromCString(charPtr + i)
-    Print ""
-	Print "hp was: " + hp
-    While i < hp And embeddedStr <> s
-        embeddedStr = String.FromCString(charPtr + i)
-        i :+ embeddedStr.Length + 1 ' we will store as null terminated C string
-    Wend
+		Local charPtr:Byte Ptr = cell
+		Local embeddedStr:String = String.FromCString(charPtr)
+		While i < hp And embeddedStr <> s
+			i :+ embeddedStr.Length + 1
+			embeddedStr = String.FromCString(charPtr + i)
+		Wend
     
-    If i = hp
-        Local s_size:Size_T = s.Length + 1
-        hp :+ s_size
-        s.ToUTF8StringBuffer(charPtr + i, s_size)
-        If hp > (sp Shl 3)
-            Print "B-LISP: Critical Error! Heap pointer greater than stack pointer!"
-        EndIf
-    EndIf
+		If i = hp
+			Local s_size:Size_T = s.Length + 1
+			hp :+ s_size
+			s.ToUTF8StringBuffer(charPtr + i, s_size)
+			If hp > (sp Shl 3)
+				Print "B-LISP: Critical Error! Heap pointer greater than stack pointer!"
+			EndIf
+		EndIf
     GCResume()
-	Print "Interning symbol: " + s
-	Print "hp is now: " + hp
     Return box(ATOM_TAG, i)
 End Function
 
@@ -130,7 +126,7 @@ Function cons:Double(x:Double, y:Double)
 End Function
 
 ' return the car of the pair or ERR if not a pair
-Function car:Double(p:Double) ' check
+Function car:Double(p:Double)
     If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
         Return cell[ord(p) + 1]
     End If
@@ -138,7 +134,7 @@ Function car:Double(p:Double) ' check
 End Function
 
 ' return the cdr of the pair or ERR if not a pair
-Function cdr:Double(p:Double) ' check
+Function cdr:Double(p:Double)
     If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
         Return cell[ord(p)]
     End If
@@ -146,12 +142,12 @@ Function cdr:Double(p:Double) ' check
 End Function
 
 ' construct a pair to add to environment e, returns the list ((v . x) . e)
-Function pair:Double(v:Double, x:Double, e:Double) ' check
+Function pair:Double(v:Double, x:Double, e:Double)
     Return cons(cons(v, x), e)
 End Function
 
 ' construct a closure, returns a NaN-boxed CLOS_TAG
-Function closure:Double(v:Double, x:Double, e:Double) ' check
+Function closure:Double(v:Double, x:Double, e:Double)
     '  return box(CLOS,ord(pair(v,x,equ(e,env) ? nil : e))); }
     Local env:Double
     If equ(e, env_val) Then env = nil_val Else env = e
@@ -437,11 +433,12 @@ Function main:Int()
 	
 	Local val_a:Double = num(64)
 	Local val_b:Double = num(36)	
-	For Local op:String = EachIn ["*"]
+	For Local op:String = EachIn ["*", "/", "+", "-"]
 		Local expr:Double = cons(atom(op), cons(val_a, cons(val_b, nil_val)))
 		Print "Doing the function: " + op + " with values: a: " + val_a + " b: " + val_b
 		Print "Result is : " + eval(expr, env_val)
 	Next
+	Print ord(eval(atom("+"), env_val))
 	Return 0
 End Function
 
@@ -508,6 +505,11 @@ Function debugPrint(x:Double)
     Print "Storage Bits: $" + LongHex(val & $FFFFFFFFFFFF:ULong)
     Print "*** end debug ***~n"
 End Function
+
+For Local d:Double = EachIn cell
+	
+Next
+
 
 Function dump()
     GCSuspend()
