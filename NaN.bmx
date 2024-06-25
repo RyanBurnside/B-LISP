@@ -3,13 +3,12 @@ SuperStrict
 Import brl.retro
 Import text.format
 
-' The following is a bit of a hack
-' We want to force the Lisp expression (double) into being misread as an unsighed int
+' We want to force the Lisp expression (double) into being read as an unsighed int
 ' this allows us to shift the bits and find the tag it was encoded with
 Function T:ULong(x:Double) Inline
     GCSuspend()
-    Local ulong_ptr:ULong Ptr = Varptr x
-    Local result:ULong = ulong_ptr[0] Shr 48
+		Local ulong_ptr:ULong Ptr = Varptr x
+		Local result:ULong = ulong_ptr[0] Shr 48
     GCResume()
     Return result
 End Function
@@ -21,16 +20,11 @@ Global sp:ULong = N ' stack pointer
 
 Global cell:Double[N]
 
-Function reset()
-    Print "B-LISP: Resetting heap and stack,"
-    Print "B-LIsp: Using " + String(N) + " Cells."
-    hp = 0 ' heap pointer
-    sp = N ' stack pointer
-    cell = New Double[N]
-End Function
 
-' Reset
-reset()
+Print "B-LISP: Resetting heap and stack,"
+Print "B-Lisp: Using " + String(N) + " Cells."
+hp = 0 ' heap pointer
+sp = N ' stack pointer
 
 ' NaN box constant "tags"
 Const ATOM_TAG:ULong = $7ff8  'atom
@@ -50,7 +44,8 @@ Function tagToString:String(tag:ULong)
     End Select
 End Function
 
-Global nil_val:Double ' Ask Pete about these...
+' These will get populated in main()
+Global nil_val:Double
 Global tru_val:Double 
 Global err_val:Double
 Global env_val:Double
@@ -60,19 +55,19 @@ Global env_val:Double
 Function box:Double(tag:ULong, i:ULong) Inline
     Local temp:Double
     GCSuspend()
-    Local u_longptr:ULong Ptr = Varptr temp
-    u_longptr[0] = tag Shl 48 | i
-    GCResume()
+		Local u_longptr:ULong Ptr = Varptr temp
+		u_longptr[0] = tag Shl 48 | i
+		GCResume()
     Return temp
 End Function
 
 ''' ord(x): returns the ordinal of the NaN-boxed Double x
 ''' not representative of *actual* value in base 10 
-Function ord:ULong(n:Double) Inline
-    Local temp:ULong    
+Function ord:ULong(x:Double) Inline
+    Local temp:ULong
     GCSuspend()
-    Local u_longptr:ULong Ptr = Varptr n
-    temp = u_longptr[0] & $ffffffffffff:ULong
+		Local u_longptr:ULong Ptr = Varptr x
+        temp = u_longptr[0] & $ffffffffffff:ULong
     GCResume()
     Return temp
 End Function 
@@ -86,9 +81,9 @@ End Function
 Function equ:ULong(x:Double, y:Double) Inline
     Local temp:ULong
     GCSuspend()
-    Local u_longptr_x:ULong Ptr = Varptr x
-    Local u_longptr_y:ULong Ptr = Varptr y
-    temp = (u_longptr_x[0] = u_longptr_y[0])
+		Local u_longptr_x:ULong Ptr = Varptr x
+		Local u_longptr_y:ULong Ptr = Varptr y
+		temp = (u_longptr_x[0] = u_longptr_y[0])
     GCResume()
     Return temp
 EndFunction
@@ -99,7 +94,8 @@ Function atom:Double(s:String)
     GCSuspend()
     Local charPtr:Byte Ptr = cell
     Local embeddedStr:String = String.FromCString(charPtr + i)
-    
+    Print ""
+	Print "hp was: " + hp
     While i < hp And embeddedStr <> s
         embeddedStr = String.FromCString(charPtr + i)
         i :+ embeddedStr.Length + 1 ' we will store as null terminated C string
@@ -109,13 +105,13 @@ Function atom:Double(s:String)
         Local s_size:Size_T = s.Length + 1
         hp :+ s_size
         s.ToUTF8StringBuffer(charPtr + i, s_size)
-        Print s
         If hp > (sp Shl 3)
             Print "B-LISP: Critical Error! Heap pointer greater than stack pointer!"
-            reset()
         EndIf
     EndIf
     GCResume()
+	Print "Interning symbol: " + s
+	Print "hp is now: " + hp
     Return box(ATOM_TAG, i)
 End Function
 
@@ -125,7 +121,11 @@ Function cons:Double(x:Double, y:Double)
     cell[sp] = x
     sp :- 1
     cell[sp] = y
-    If (hp > sp Shl 3) Then reset()
+    If (hp > sp Shl 3)
+		Print "Unrecoverable error: stack overflow"
+		Local zero:Int = 0
+		Local kill_me:Double = 1 / zero
+	EndIf	
     Return box(CONS_TAG, sp)
 End Function
 
@@ -160,10 +160,11 @@ End Function
 
 ' look up a symbol in an environment, return its value or err if not found
 Function assoc:Double(v:Double, e:Double)
-    While T(e) = CONS_TAG And Not equ(v, car(car(e)))
+    While T(e) = CONS_TAG And (Not equ(v, car(car(e))))
         e = cdr(e)
     Wend
-    If T(e) = CONS_TAG Then Return cdr(car(e)) Else Return err_val
+    If T(e) = CONS_TAG Then Return cdr(car(e))
+    Return err_val
 End Function
 
 ' lispNot(x) is nonzero if x is the lisp () empty list
@@ -263,7 +264,8 @@ End Function
 Function f_mul:Double(tt:Double, e:Double)
     tt = evlis(tt, e)
     If T(tt) = NIL_TAG Then Return num(1)
-    Local n:Double = 1
+    Local n:Double = car(tt)
+	tt = cdr(tt)
     While Not lispNot(tt)
         n :* car(tt)
         tt = cdr(tt)
@@ -278,7 +280,6 @@ Function f_div:Double(tt:Double, e:Double)
     If T(cdr(tt)) = NIL_TAG Then Return num(1.0 / n)
 	tt = cdr(tt)
     While Not lispNot(tt)
-    Print ">" + n
         n :/ car(tt)
         tt = cdr(tt)
     Wend
@@ -359,6 +360,7 @@ Function f_define:Double(tt:Double, e:Double)
     Return car(tt)
 End Function
 
+
 ' table of Lisp primitives, each has a name s And a Function pointer f
 Type fnPointer
     Field s:String
@@ -423,22 +425,23 @@ Function eval:Double(x:Double, e:Double)
     End Select
 End Function
 
-
 Function main:Int()
-	Local i:ULong
-	Local v:Double
 	Print "Starting B-LISP"
 	nil_val = box(NIL_TAG, 0)
 	err_val = atom("ERR")
 	tru_val = atom("#t")
 	env_val = pair(tru_val, tru_val, nil_val)
-	For Local i:Int = 0 Until prim.Length 
+	For Local i:Int = 0 Until prim.Length
 		env_val = pair(atom(prim[i].s), box(PRIM_TAG, i), env_val)
 	Next
-	Local expr:Double
-	expr = eval(cons(atom("+"), cons(num(64), cons(num(72), nil_val))), env_val)
-	v = f_sub(cons(num(-32), nil_val), env_val)
-	debugPrint(v)
+	
+	Local val_a:Double = num(64)
+	Local val_b:Double = num(36)	
+	For Local op:String = EachIn ["*"]
+		Local expr:Double = cons(atom(op), cons(val_a, cons(val_b, nil_val)))
+		Print "Doing the function: " + op + " with values: a: " + val_a + " b: " + val_b
+		Print "Result is : " + eval(expr, env_val)
+	Next
 	Return 0
 End Function
 
@@ -449,8 +452,8 @@ Function debugPrint(x:Double)
     Local mask:ULong = $ff
     
     GCSuspend()
-    Local u_longptr:ULong Ptr = Varptr x
-    val = u_longptr[0]
+		Local u_longptr:ULong Ptr = Varptr x
+		val = u_longptr[0]
     GCResume()
     
     mask :Shl 56
