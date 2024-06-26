@@ -3,6 +3,13 @@ SuperStrict
 Import brl.retro
 Import text.format
 
+
+' This stupid thing needs to exist because blitzmax
+' mandates newlines with Print
+Function prin(s:String)
+	StandardIOStream.WriteString s
+End Function
+
 ' We want to force the Lisp expression (double) into being read as an unsighed int
 ' this allows us to shift the bits and find the tag it was encoded with
 Function T:ULong(x:Double) Inline
@@ -102,10 +109,10 @@ Function atom:Double(s:String)
 		If i = hp
 			Local s_size:Size_T = s.Length + 1
 			hp :+ s_size
-			s.ToUTF8StringBuffer(charPtr + i, s_size)
 			If hp > (sp Shl 3)
 				Print "B-LISP: Critical Error! Heap pointer greater than stack pointer!"
 			EndIf
+			s.ToUTF8StringBuffer(charPtr + i, s_size)
 		EndIf
     GCResume()
     Return box(ATOM_TAG, i)
@@ -421,6 +428,39 @@ Function eval:Double(x:Double, e:Double)
     End Select
 End Function
 
+Function printlist(tt:Double)
+	prin "("
+	Repeat
+		prin " "
+		lispPrint car(tt)
+		tt = cdr(tt)
+		If T(tt) = NIL_TAG Then Exit
+		If T(tt) <> CONS_TAG
+			prin " . "
+			lispPrint(tt)
+			Exit
+		End If
+	Forever	
+	prin ")"
+End Function
+
+Function lispPrint(x:Double)
+	Select T(x)
+	Case NIL_TAG prin "()"
+	Case ATOM_TAG
+		GCSuspend()
+			Local A:Byte Ptr = cell
+			prin "".FromCString(A+ord(x))
+		GCResume()
+	Case PRIM_TAG prin "<" + prim[ord(x)].s + ">"
+	Case CONS_TAG printlist(x)
+	Case CLOS_TAG prin "{" + ULong(ord(x)) + "}"
+	Default
+		Local F:TFormatter = New TFormatter.Create("%.10f") ' test
+		prin F.arg(x).format()
+	End Select
+End Function
+
 Function main:Int()
 	Print "Starting B-LISP"
 	nil_val = box(NIL_TAG, 0)
@@ -509,7 +549,6 @@ End Function
 For Local d:Double = EachIn cell
 	
 Next
-
 
 Function dump()
     GCSuspend()
