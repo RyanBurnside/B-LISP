@@ -431,7 +431,6 @@ End Function
 Function printlist(tt:Double)
 	prin "("
 	Repeat
-		prin " "
 		lispPrint car(tt)
 		tt = cdr(tt)
 		If T(tt) = NIL_TAG Then Exit
@@ -440,6 +439,7 @@ Function printlist(tt:Double)
 			lispPrint(tt)
 			Exit
 		End If
+		prin " "
 	Forever	
 	prin ")"
 End Function
@@ -461,6 +461,8 @@ Function lispPrint(x:Double)
 	End Select
 End Function
 
+
+
 Function main:Int()
 	Print "Starting B-LISP"
 	nil_val = box(NIL_TAG, 0)
@@ -478,7 +480,13 @@ Function main:Int()
 		Print "Doing the function: " + op + " with values: a: " + val_a + " b: " + val_b
 		Print "Result is : " + eval(expr, env_val)
 	Next
-	Print ord(eval(atom("+"), env_val))
+
+	Local subLis:Double = cons(box(PRIM_TAG, 6), cons(22, cons(32, nil_val)))
+	Local sexp:Double = cons(box(PRIM_TAG, 5), cons(22, cons(subLis, cons(42, nil_val))))
+	Print ""
+	lispPrint(sexp)
+	Print "~n"
+	prin ">>>" + eval(sexp, env_val)
 	Return 0
 End Function
 
