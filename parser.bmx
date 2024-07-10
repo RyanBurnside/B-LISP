@@ -20,7 +20,9 @@ Enum TokenType
 	LPAREN,
 	RPAREN,
 	LDOT,
-	ERROR
+	SKIP, ' Handles whitespace
+	ERROR,
+	TEXT_EOF
 End Enum
 
 Function stringToTokenType:TokenType(str:String)
@@ -35,6 +37,8 @@ Function stringToTokenType:TokenType(str:String)
 	Case "LPAREN" Return TokenType.LPAREN
 	Case "RPAREN" Return TokenType.RPAREN
 	Case "LDOT" Return TokenType.LDOT
+	Case "SKIP" Return TokenType.SKIP
+	Case "ERROR" Return TokenType.ERROR
 	Default Return TokenType.ERROR
 	End Select
 End Function
@@ -53,20 +57,17 @@ End Function
 Type Token
     Field typ:TokenType
     Field value:String
-    Field line:Int
-    Field column:Int
-    Global formatter:TFormatter = TFormatter.Create("<Token name:%s(%d), value:%s, line:%d, column:%d>")
+	' add line and column errors later (if one gives a shit)
+    Global formatter:TFormatter = TFormatter.Create("<Token %s(%d), '%s' >")
     
-    Method New(typ:TokenType, value:String, line:Int, column:Int)
+    Method New(typ:TokenType, value:String)
         Self.typ = typ
         Self.value = value
-        Self.line = line
-        Self.column = column
     End Method
     
     Method Print()
         formatter.Clear()
-        formatter.Arg(typ.ToString()).Arg(Int(typ)).Arg(value).Arg(line).Arg(column)
+        formatter.Arg(typ.ToString()).Arg(Int(typ)).Arg(value)
         Print formatter.format()
     End Method
 End Type
@@ -83,7 +84,8 @@ Function makeRegexTableBlisp:String[][] ()
             ["LPAREN",    "\("],
             ["RPAREN",    "\)"],
             ["LDOT",       "\."],
-            ["SKIP",      "[ \t]"]]
+            ["SKIP",      "[ \t\n]+"],
+			["ERROR",     "[^ \t\n]+"]]
 End Function
 
 ' This turns a regex table into a single regex with named capture groups
@@ -108,45 +110,56 @@ Function RegexTableToRegex:TRegEx(regexTable:String[][])
     Return TRegEx.Create("|".join(temp))
 End Function
 
-Function Tokenize(regexTable:String[][], s:String)
-    ' Regex documentation https://www.blitzmax.org/docs/en/api/text/text.regex/
+Type Lexer
+	' Regex Class
+	Field getToken:TRegEx
     
-    ' Regex Class
-    Local getToken:TRegEx = RegexTableToRegex(regexTable)
-    
-    ' Regex match class
-    Local matcher:TRegExMatch = getToken.Find(s)
-    
-    ' Tokenization details
-    Local line:Int = 1
-    Local pos:Int = 0
-    Local lineStart:Int = 0
-    
-    ' Collects tokens from list
-    Local tokenList:TList = New TList
-    
-    While matcher
-        For Local n:String[] = EachIn regexTable
-            Local captureName:String = n[0]
-            Local matched:String = matcher.SubExpByName(captureName)
-			Local captureType:TokenType = stringToTokenType(captureName)
-            If matched <> "" And captureName <> "SKIP"
-                tokenList.AddLast(New Token(captureType, matched, -1, -1))
-                Exit ' early break, 1 match per regex (most specific)
-            End If 
-        Next
-        matcher = getToken.Find()
-    Wend
+	' Regex match class
+	Field matcher:TRegExMatch
+	Field regexTable:String[][]
+	
+	Method New(regexTable:String[][], text:String)
+		Self.regexTable = regexTable 
+		getToken = RegexTableToRegex(regexTable)
+		matcher = getToken.Find(text)
+	End Method
+	
+	Method NextToken:Token()
+		Local captureType:TokenType
+		Local matched:String
+						
+		While matcher
+			For Local n:String[] = EachIn regexTable
+				Local captureName:String = n[0]
+				matched:String = matcher.SubExpByName(captureName)
+				captureType:TokenType = stringToTokenType(captureName)
+				If matched <> "" And captureType <> TokenType.SKIP
+					matcher = getToken.Find()
+					' Acts like yield, getToken has next match ready to go
+					Return New Token(captureType, matched)
+				End If 
+			Next
+			matcher = getToken.Find()
+		Wend
+		Return New Token(TokenType.TEXT_EOF, "")
+	End Method
+End Type
 
-    For Local t:Token = EachIn(tokenList)
-        t.Print()
-    Next
+Function main()
+	Print "In main ..."
+	Local statements:String = """
+		(* (+ FOO *BAR* +BAZ+) |foobar| BAZ 42 43.5)
+		`(,SYM ,@(1 2 3 4))
+		'(3 . 4)
+"""
+	Local lexer:Lexer = New Lexer(makeRegexTableBlisp(), statements)
+	
+	Local nextToken:Token = lexer.NextToken() 
+	While nextToken.typ <> TokenType.TEXT_EOF 
+		nextToken.Print()
+		nextToken = lexer.NextToken()
+	Wend
+	nextToken.Print()
 End Function
 
-Local statements:String = """
-    (* (+ FOO *BAR* +BAZ+) BAZ 42 43.5)
-    `(,SYM ,@(1 2 3 4))
-     '(3 . 4)
-"""
-
-Tokenize(makeRegexTableBlisp(), statements)
+main()
