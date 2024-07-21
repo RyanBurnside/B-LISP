@@ -1,37 +1,26 @@
-' This module follows much of the TinyLisp (99 lines of C) implementation
+
 SuperStrict
 Import brl.retro
 Import text.format
+Import Text.RegEx
 
 
-' This stupid thing needs to exist because blitzmax
-' mandates newlines with Print
-Function prin(s:String)
-	StandardIOStream.WriteString s
-End Function
+' For lexer
+Enum TokenType
+	SYMBOL,
+	NUMBER,
+	BACKQUOTE,
+	SPLICE,
+	COMMA,
+	QUOTE,
+	LPAREN,
+	RPAREN,
+	LDOT,
+	SKIP, ' Handles whitespace
+	ERROR,
+	TEXT_EOF
+End Enum
 
-' We want to force the Lisp expression (double) into being read as an unsighed int
-' this allows us to shift the bits and find the tag it was encoded with
-Function T:ULong(x:Double) Inline
-    GCSuspend()
-		Local ulong_ptr:ULong Ptr = Varptr x
-		Local result:ULong = ulong_ptr[0] Shr 48
-    GCResume()
-    Return result
-End Function
-
-Global N:UInt = 1024 ' number of Lisp objects (doubles) to store for the VM
-
-Global hp:ULong = 0 ' heap pointer
-Global sp:ULong = N ' stack pointer
-
-Global cell:Double[N]
-
-
-Print "B-LISP: Resetting heap and stack,"
-Print "B-Lisp: Using " + String(N) + " Cells."
-hp = 0 ' heap pointer
-sp = N ' stack pointer
 
 ' NaN box constant "tags"
 Const ATOM_TAG:ULong = $7ff8  'atom
@@ -39,6 +28,25 @@ Const PRIM_TAG:ULong = $7ff9  'primitive
 Const CONS_TAG:ULong = $7ffa  'cons cell
 Const CLOS_TAG:ULong = $7ffb  'closure
 Const NIL_TAG:ULong  = $7ffc  'duh
+
+Global N:UInt = 1024 ' number of Lisp objects (doubles) to store for the VM
+Global hp:ULong = 0 ' heap pointer
+Global sp:ULong = N ' stack pointer
+Global cell:Double[N]
+
+' These will get populated in main()
+Global nil_val:Double
+Global tru_val:Double 
+Global err_val:Double
+Global env_val:Double
+
+' This module follows much of the TinyLisp (99 lines of C) implementation
+
+' This stupid thing needs to exist because blitzmax
+' mandates newlines with Print
+Function prin(s:String)
+	StandardIOStream.WriteString s
+End Function
 
 Function tagToString:String(tag:ULong)
     Select tag
@@ -51,11 +59,15 @@ Function tagToString:String(tag:ULong)
     End Select
 End Function
 
-' These will get populated in main()
-Global nil_val:Double
-Global tru_val:Double 
-Global err_val:Double
-Global env_val:Double
+' We want to force the Lisp expression (double) into being read as an unsighed int
+' this allows us to shift the bits and find the tag it was encoded with
+Function T:ULong(x:Double) Inline
+    GCSuspend()
+		Local ulong_ptr:ULong Ptr = Varptr x
+		Local result:ULong = ulong_ptr[0] Shr 48
+    GCResume()
+    Return result
+End Function
 
 ''' NaN-boxing specific functions:
 '''    box(t,i): returns a New NaN-boxed Double with tag t And ordinal i
@@ -461,15 +473,17 @@ Function lispPrint(x:Double)
 	End Select
 End Function
 
+Function gc()
+	sp = ord(env_val)
+End Function
 
-
-Function main:Int()
+Function nan_main:Int()
 	Print "Starting B-LISP"
 	nil_val = box(NIL_TAG, 0)
 	err_val = atom("ERR")
 	tru_val = atom("#t")
 	env_val = pair(tru_val, tru_val, nil_val)
-	For Local i:Int = 0 Until prim.Length
+	For Local i:ULong = 0 Until prim.Length
 		env_val = pair(atom(prim[i].s), box(PRIM_TAG, i), env_val)
 	Next
 	
@@ -490,7 +504,7 @@ Function main:Int()
 	Return 0
 End Function
 
-main()
+nan_main()
 
 Function debugPrint(x:Double)
     Local val:ULong
@@ -506,7 +520,7 @@ Function debugPrint(x:Double)
     Print "*** Debug Print ***"
     Print "Analyzed double"
     Print "Original double value: " + String.FromDouble(x)
-    Print "Sign bit:" + String.FromLong(val Shr 63)
+    Print "Sign bit:" + String.FromULong(val Shr 63)
     Print "Exponent: $" + Hex((val Shr 52) & $7FF)[5..]
     Print "Mantissa: $" + LongHex(val & $FFFFFFFFFFFFF:ULong)[3..]
     If x = x Then Print "NaN: no" Else Print "NaN: yes" 
@@ -554,10 +568,6 @@ Function debugPrint(x:Double)
     Print "*** end debug ***~n"
 End Function
 
-For Local d:Double = EachIn cell
-	
-Next
-
 Function dump()
     GCSuspend()
     Local p:Byte Ptr = cell
@@ -574,3 +584,140 @@ Function dump()
     Print buffer
     GCResume()
 End Function
+
+
+' this needs To be taken out later as Parser.bmx
+
+Function stringToTokenType:TokenType(str:String)
+	Select str
+	Case "ATOM" Return TokenType.SYMBOL
+	Case "SYMBOL" Return TokenType.SYMBOL
+	Case "NUMBER" Return TokenType.NUMBER
+	Case "BACKQUOTE" Return TokenType.BACKQUOTE
+	Case "SPLICE" Return TokenType.SPLICE
+	Case "COMMA" Return TokenType.COMMA
+	Case "QUOTE" Return TokenType.QUOTE
+	Case "LPAREN" Return TokenType.LPAREN
+	Case "RPAREN" Return TokenType.RPAREN
+	Case "LDOT" Return TokenType.LDOT
+	Case "SKIP" Return TokenType.SKIP
+	Case "ERROR" Return TokenType.ERROR
+	Default Return TokenType.ERROR
+	End Select
+End Function
+
+Type Token
+    Field typ:TokenType
+    Field value:String
+	' add line and column errors later (if one gives a shit)
+    Global formatter:TFormatter = TFormatter.Create("<Token %s(%d), '%s' >")
+    
+    Method New(typ:TokenType, value:String)
+        Self.typ = typ
+        Self.value = value
+    End Method
+    
+    Method Print()
+        formatter.Clear()
+        formatter.Arg(typ.ToString()).Arg(Int(typ)).Arg(value)
+        Print formatter.format()
+    End Method
+End Type
+
+' This is the regex table (to be transformed) for B-LISP
+Function makeRegexTableBlisp:String[][] ()
+    ' Regex groups, order by most specific to least
+    Return [["SYMBOL",    "[A-Za-z!@#$%^&*-+\\<>]+"],
+            ["NUMBER",    "\d+(\.\d*)?"],
+            ["BACKQUOTE", "`"],
+            ["SPLICE",    ",@"],
+            ["COMMA",     ","],
+            ["QUOTE",     "'"],
+            ["LPAREN",    "\("],
+            ["RPAREN",    "\)"],
+            ["LDOT",       "\."],
+            ["SKIP",      "[ \t\n]+"],
+			["ERROR",     "[^ \t\n]+"]]
+End Function
+
+' This turns a regex table into a single regex with named capture groups
+Function RegexTableToRegex:TRegEx(regexTable:String[][])
+    ' Accessory fn to transform the tokenSpecification sub arrays into regex group
+    Function JoinTokenSpecs:String(ID:String, Regex:String)
+        Global regPair:TFormatter = TFormatter.Create("(?P<%s>%s)")
+        regPair.clear()
+        regPair.Arg(ID).Arg(Regex)
+        Return regPair.format()
+    End Function
+    
+    Local temp:String[regexTable.Length]
+    Local counter:Int = 0
+
+    For Local i:String[] = EachIn regexTable
+        temp[counter] = JoinTokenSpecs(i[0], i[1])
+        counter :+ 1
+    Next
+    
+    ' Multi-Part joined Regex String for token
+    Return TRegEx.Create("|".join(temp))
+End Function
+
+Type Lexer
+	' Regex Class
+	Field getToken:TRegEx
+    
+	' Regex match class
+	Field matcher:TRegExMatch
+	Field regexTable:String[][]
+	
+	Method New(regexTable:String[][], text:String)
+		Self.regexTable = regexTable 
+		getToken = RegexTableToRegex(regexTable)
+		matcher = getToken.Find(text)
+	End Method
+	
+	Method NextToken:Token()
+		Local captureType:TokenType
+		Local matched:String
+						
+		While matcher
+			For Local n:String[] = EachIn regexTable
+				Local captureName:String = n[0]
+				matched:String = matcher.SubExpByName(captureName)
+				captureType:TokenType = stringToTokenType(captureName)
+				If matched <> "" And captureType <> TokenType.SKIP
+					matcher = getToken.Find()
+					' Acts like yield, getToken has next match ready to go
+					Return New Token(captureType, matched)
+				End If 
+			Next
+			matcher = getToken.Find()
+		Wend
+		Return New Token(TokenType.TEXT_EOF, "")
+	End Method
+End Type
+
+' ----------------------------------------------------------------------------
+
+
+
+' ----------------------------------------------------------------------------
+
+Function main()
+	Print "In main ..."
+	Local statements:String = """
+		(* (+ FOO *BAR* +BAZ+) |foobar| BAZ 42 43.5)
+		`(,SYM ,@(1 2 3 4))
+		'(3 . 4)
+"""
+	Local lexer:Lexer = New Lexer(makeRegexTableBlisp(), statements)
+	
+	Local nextToken:Token = lexer.NextToken() 
+	While nextToken.typ <> TokenType.TEXT_EOF 
+		nextToken.Print()
+		nextToken = lexer.NextToken()
+	Wend
+	nextToken.Print()
+End Function
+
+main()
