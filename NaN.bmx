@@ -4,23 +4,21 @@ Import brl.retro
 Import text.format
 Import Text.RegEx
 
-
 ' For lexer
 Enum TokenType
-	SYMBOL,
-	NUMBER,
-	BACKQUOTE,
-	SPLICE,
-	COMMA,
-	QUOTE,
-	LPAREN,
-	RPAREN,
-	LDOT,
-	SKIP, ' Handles whitespace
-	ERROR,
-	TEXT_EOF
+    SYMBOL,
+    NUMBER,
+    BACKQUOTE,
+    SPLICE,
+    COMMA,
+    QUOTE,
+    LPAREN,
+    RPAREN,
+    LDOT,
+    SKIP, ' Handles whitespace
+    ERROR,
+    TEXT_EOF
 End Enum
-
 
 ' NaN box constant "tags"
 Const ATOM_TAG:ULong = $7ff8  'atom
@@ -36,6 +34,7 @@ Global cell:Double[N]
 
 ' These will get populated in main()
 Global nil_val:Double
+Global quit_val:Double
 Global tru_val:Double 
 Global err_val:Double
 Global env_val:Double
@@ -45,7 +44,7 @@ Global env_val:Double
 ' This stupid thing needs to exist because blitzmax
 ' mandates newlines with Print
 Function prin(s:String)
-	StandardIOStream.WriteString s
+    StandardIOStream.WriteString s
 End Function
 
 Function tagToString:String(tag:ULong)
@@ -63,8 +62,8 @@ End Function
 ' this allows us to shift the bits and find the tag it was encoded with
 Function T:ULong(x:Double) Inline
     GCSuspend()
-		Local ulong_ptr:ULong Ptr = Varptr x
-		Local result:ULong = ulong_ptr[0] Shr 48
+        Local ulong_ptr:ULong Ptr = Varptr x
+        Local result:ULong = ulong_ptr[0] Shr 48
     GCResume()
     Return result
 End Function
@@ -74,9 +73,9 @@ End Function
 Function box:Double(tag:ULong, i:ULong) Inline
     Local temp:Double
     GCSuspend()
-		Local u_longptr:ULong Ptr = Varptr temp
-		u_longptr[0] = tag Shl 48 | i
-		GCResume()
+        Local u_longptr:ULong Ptr = Varptr temp
+        u_longptr[0] = tag Shl 48 | i
+        GCResume()
     Return temp
 End Function
 
@@ -85,7 +84,7 @@ End Function
 Function ord:ULong(x:Double) Inline
     Local temp:ULong
     GCSuspend()
-		Local u_longptr:ULong Ptr = Varptr x
+        Local u_longptr:ULong Ptr = Varptr x
         temp = u_longptr[0] & $ffffffffffff:ULong
     GCResume()
     Return temp
@@ -100,9 +99,9 @@ End Function
 Function equ:ULong(x:Double, y:Double) Inline
     Local temp:ULong
     GCSuspend()
-		Local u_longptr_x:ULong Ptr = Varptr x
-		Local u_longptr_y:ULong Ptr = Varptr y
-		temp = (u_longptr_x[0] = u_longptr_y[0])
+        Local u_longptr_x:ULong Ptr = Varptr x
+        Local u_longptr_y:ULong Ptr = Varptr y
+        temp = (u_longptr_x[0] = u_longptr_y[0])
     GCResume()
     Return temp
 EndFunction
@@ -111,21 +110,21 @@ EndFunction
 Function atom:Double(s:String)
     Local i:ULong = 0
     GCSuspend()
-		Local charPtr:Byte Ptr = cell
-		Local embeddedStr:String = String.FromCString(charPtr)
-		While i < hp And embeddedStr <> s
-			i :+ embeddedStr.Length + 1
-			embeddedStr = String.FromCString(charPtr + i)
-		Wend
+        Local charPtr:Byte Ptr = cell
+        Local embeddedStr:String = String.FromCString(charPtr)
+        While i < hp And embeddedStr <> s
+            i :+ embeddedStr.Length + 1
+            embeddedStr = String.FromCString(charPtr + i)
+        Wend
     
-		If i = hp
-			Local s_size:Size_T = s.Length + 1
-			hp :+ s_size
-			If hp > (sp Shl 3)
-				Print "B-LISP: Critical Error! Heap pointer greater than stack pointer!"
-			EndIf
-			s.ToUTF8StringBuffer(charPtr + i, s_size)
-		EndIf
+        If i = hp
+            Local s_size:Size_T = s.Length + 1
+            hp :+ s_size
+            If hp > (sp Shl 3)
+                Print "B-LISP: Critical Error! Heap pointer greater than stack pointer!"
+            EndIf
+            s.ToUTF8StringBuffer(charPtr + i, s_size)
+        EndIf
     GCResume()
     Return box(ATOM_TAG, i)
 End Function
@@ -137,10 +136,10 @@ Function cons:Double(x:Double, y:Double)
     sp :- 1
     cell[sp] = y
     If (hp > sp Shl 3)
-		Print "Unrecoverable error: stack overflow"
-		Local zero:Int = 0
-		Local kill_me:Double = 1 / zero
-	EndIf	
+        Print "Unrecoverable error: stack overflow"
+        Local zero:Int = 0
+        Local kill_me:Double = 1 / zero
+    EndIf    
     Return box(CONS_TAG, sp)
 End Function
 
@@ -258,7 +257,7 @@ Function f_add:Double(tt:Double, e:Double)
     Local n:Double = 0
     While Not lispNot(tt)
         n :+ car(tt)
-		tt = cdr(tt)
+        tt = cdr(tt)
     Wend
     Return num(n)
 End Function
@@ -268,10 +267,10 @@ Function f_sub:Double(tt:Double, e:Double)
     If T(tt) = NIL_TAG Then Return err_val
     Local n:Double = car(tt)
     If T(cdr(tt)) = NIL_TAG Then Return num(-n)
-	tt = cdr(tt)
+    tt = cdr(tt)
     While Not lispNot(tt)
         n :- car(tt)
-	    tt = cdr(tt)
+        tt = cdr(tt)
     Wend
     Return num(n)
 End Function
@@ -280,7 +279,7 @@ Function f_mul:Double(tt:Double, e:Double)
     tt = evlis(tt, e)
     If T(tt) = NIL_TAG Then Return num(1)
     Local n:Double = car(tt)
-	tt = cdr(tt)
+    tt = cdr(tt)
     While Not lispNot(tt)
         n :* car(tt)
         tt = cdr(tt)
@@ -293,7 +292,7 @@ Function f_div:Double(tt:Double, e:Double)
     Local n:Double = car(tt)
     If T(tt) = NIL_TAG Then Return err_val
     If T(cdr(tt)) = NIL_TAG Then Return num(1.0 / n)
-	tt = cdr(tt)
+    tt = cdr(tt)
     While Not lispNot(tt)
         n :/ car(tt)
         tt = cdr(tt)
@@ -375,6 +374,9 @@ Function f_define:Double(tt:Double, e:Double)
     Return car(tt)
 End Function
 
+Function f_quit:Double(tt:Double, e:Double)
+    Return quit_val
+End Function
 
 ' table of Lisp primitives, each has a name s And a Function pointer f
 Type fnPointer
@@ -406,7 +408,8 @@ New fnPointer("cond",   f_cond),
 New fnPointer("if",     f_if),
 New fnPointer("let*",   f_leta),
 New fnPointer("lambda", f_lambda),
-New fnPointer("define", f_define)]
+New fnPointer("define", f_define),
+New fnPointer("quit", f_quit)]
 
 ' create environment by extending e with the variables v bount to values t
 
@@ -441,78 +444,49 @@ Function eval:Double(x:Double, e:Double)
 End Function
 
 Function printlist(tt:Double)
-	prin "("
-	Repeat
-		lispPrint car(tt)
-		tt = cdr(tt)
-		If T(tt) = NIL_TAG Then Exit
-		If T(tt) <> CONS_TAG
-			prin " . "
-			lispPrint(tt)
-			Exit
-		End If
-		prin " "
-	Forever	
-	prin ")"
+    prin "("
+    Repeat
+        lispPrint car(tt)
+        tt = cdr(tt)
+        If T(tt) = NIL_TAG Then Exit
+        If T(tt) <> CONS_TAG
+            prin " . "
+            lispPrint(tt)
+            Exit
+        End If
+        prin " "
+    Forever    
+    prin ")"
 End Function
 
 Function lispPrint(x:Double)
-	Select T(x)
-	Case NIL_TAG prin "()"
-	Case ATOM_TAG
-		GCSuspend()
-			Local A:Byte Ptr = cell
-			prin "".FromCString(A+ord(x))
-		GCResume()
-	Case PRIM_TAG prin "<" + prim[ord(x)].s + ">"
-	Case CONS_TAG printlist(x)
-	Case CLOS_TAG prin "{" + ULong(ord(x)) + "}"
-	Default
-		Local F:TFormatter = New TFormatter.Create("%.10f") ' test
-		prin F.arg(x).format()
-	End Select
+    Select T(x)
+    Case NIL_TAG prin "()"
+    Case ATOM_TAG
+        GCSuspend()
+            Local A:Byte Ptr = cell
+            prin "".FromCString(A+ord(x))
+        GCResume()
+    Case PRIM_TAG prin "<" + prim[ord(x)].s + ">"
+    Case CONS_TAG printlist(x)
+    Case CLOS_TAG prin "{" + ULong(ord(x)) + "}"
+    Default
+        Local F:TFormatter = New TFormatter.Create("%.10f") ' test
+        prin F.arg(x).format()
+    End Select
 End Function
 
 Function gc()
-	sp = ord(env_val)
+    sp = ord(env_val)
 End Function
-
-Function nan_main:Int()
-	Print "Starting B-LISP"
-	nil_val = box(NIL_TAG, 0)
-	err_val = atom("ERR")
-	tru_val = atom("#t")
-	env_val = pair(tru_val, tru_val, nil_val)
-	For Local i:ULong = 0 Until prim.Length
-		env_val = pair(atom(prim[i].s), box(PRIM_TAG, i), env_val)
-	Next
-	
-	Local val_a:Double = num(64)
-	Local val_b:Double = num(36)	
-	For Local op:String = EachIn ["*", "/", "+", "-"]
-		Local expr:Double = cons(atom(op), cons(val_a, cons(val_b, nil_val)))
-		Print "Doing the function: " + op + " with values: a: " + val_a + " b: " + val_b
-		Print "Result is : " + eval(expr, env_val)
-	Next
-
-	Local subLis:Double = cons(box(PRIM_TAG, 6), cons(22, cons(32, nil_val)))
-	Local sexp:Double = cons(box(PRIM_TAG, 5), cons(22, cons(subLis, cons(42, nil_val))))
-	Print ""
-	lispPrint(sexp)
-	Print "~n"
-	prin ">>>" + eval(sexp, env_val)
-	Return 0
-End Function
-
-nan_main()
 
 Function debugPrint(x:Double)
     Local val:ULong
     Local mask:ULong = $ff
     
     GCSuspend()
-		Local u_longptr:ULong Ptr = Varptr x
-		val = u_longptr[0]
+        Local u_longptr:ULong Ptr = Varptr x
+        val = u_longptr[0]
     GCResume()
     
     mask :Shl 56
@@ -589,27 +563,27 @@ End Function
 ' this needs To be taken out later as Parser.bmx
 
 Function stringToTokenType:TokenType(str:String)
-	Select str
-	Case "ATOM" Return TokenType.SYMBOL
-	Case "SYMBOL" Return TokenType.SYMBOL
-	Case "NUMBER" Return TokenType.NUMBER
-	Case "BACKQUOTE" Return TokenType.BACKQUOTE
-	Case "SPLICE" Return TokenType.SPLICE
-	Case "COMMA" Return TokenType.COMMA
-	Case "QUOTE" Return TokenType.QUOTE
-	Case "LPAREN" Return TokenType.LPAREN
-	Case "RPAREN" Return TokenType.RPAREN
-	Case "LDOT" Return TokenType.LDOT
-	Case "SKIP" Return TokenType.SKIP
-	Case "ERROR" Return TokenType.ERROR
-	Default Return TokenType.ERROR
-	End Select
+    Select str
+    Case "ATOM" Return TokenType.SYMBOL
+    Case "SYMBOL" Return TokenType.SYMBOL
+    Case "NUMBER" Return TokenType.NUMBER
+    Case "BACKQUOTE" Return TokenType.BACKQUOTE
+    Case "SPLICE" Return TokenType.SPLICE
+    Case "COMMA" Return TokenType.COMMA
+    Case "QUOTE" Return TokenType.QUOTE
+    Case "LPAREN" Return TokenType.LPAREN
+    Case "RPAREN" Return TokenType.RPAREN
+    Case "LDOT" Return TokenType.LDOT
+    Case "SKIP" Return TokenType.SKIP
+    Case "ERROR" Return TokenType.ERROR
+    Default Return TokenType.ERROR
+    End Select
 End Function
 
 Type Token
     Field typ:TokenType
     Field value:String
-	' add line and column errors later (if one gives a shit)
+    ' add line and column errors later (if one gives a shit)
     Global formatter:TFormatter = TFormatter.Create("<Token %s(%d), '%s' >")
     
     Method New(typ:TokenType, value:String)
@@ -617,18 +591,22 @@ Type Token
         Self.value = value
     End Method
     
-    Method Print()
+    Method toString:String()
         formatter.Clear()
         formatter.Arg(typ.ToString()).Arg(Int(typ)).Arg(value)
-        Print formatter.format()
+        Return formatter.format()
+    End Method
+
+    Method Print()
+        Print Self.toString()
     End Method
 End Type
 
 ' This is the regex table (to be transformed) for B-LISP
 Function makeRegexTableBlisp:String[][] ()
     ' Regex groups, order by most specific to least
-    Return [["SYMBOL",    "[A-Za-z!@#$%^&*-+\\<>]+"],
-            ["NUMBER",    "\d+(\.\d*)?"],
+    Return [["NUMBER",    "[-+]?\d+(\.\d*)?"],
+            ["SYMBOL",    "[A-Za-z!@#$%^&*\-+\\<>]+"],
             ["BACKQUOTE", "`"],
             ["SPLICE",    ",@"],
             ["COMMA",     ","],
@@ -637,7 +615,7 @@ Function makeRegexTableBlisp:String[][] ()
             ["RPAREN",    "\)"],
             ["LDOT",       "\."],
             ["SKIP",      "[ \t\n]+"],
-			["ERROR",     "[^ \t\n]+"]]
+            ["ERROR",     "[^ \t\n]+"]]
 End Function
 
 ' This turns a regex table into a single regex with named capture groups
@@ -663,61 +641,206 @@ Function RegexTableToRegex:TRegEx(regexTable:String[][])
 End Function
 
 Type Lexer
-	' Regex Class
-	Field getToken:TRegEx
+    ' Regex Class
+    Field getToken:TRegEx
     
-	' Regex match class
-	Field matcher:TRegExMatch
-	Field regexTable:String[][]
-	
-	Method New(regexTable:String[][], text:String)
-		Self.regexTable = regexTable 
-		getToken = RegexTableToRegex(regexTable)
-		matcher = getToken.Find(text)
-	End Method
-	
-	Method NextToken:Token()
-		Local captureType:TokenType
-		Local matched:String
-						
-		While matcher
-			For Local n:String[] = EachIn regexTable
-				Local captureName:String = n[0]
-				matched:String = matcher.SubExpByName(captureName)
-				captureType:TokenType = stringToTokenType(captureName)
-				If matched <> "" And captureType <> TokenType.SKIP
-					matcher = getToken.Find()
-					' Acts like yield, getToken has next match ready to go
-					Return New Token(captureType, matched)
-				End If 
-			Next
-			matcher = getToken.Find()
-		Wend
-		Return New Token(TokenType.TEXT_EOF, "")
-	End Method
+    ' Regex match class
+    Field matcher:TRegExMatch
+    Field regexTable:String[][]
+    
+    Method New(regexTable:String[][], text:String)
+        Self.regexTable = regexTable 
+        getToken = RegexTableToRegex(regexTable)
+        matcher = getToken.Find(text)
+    End Method
+    
+    Method NextToken:Token()
+        Local captureType:TokenType
+        Local matched:String
+                        
+        While matcher
+            For Local n:String[] = EachIn regexTable
+                Local captureName:String = n[0]
+                matched:String = matcher.SubExpByName(captureName)
+                captureType:TokenType = stringToTokenType(captureName)
+                If matched <> "" And captureType <> TokenType.SKIP
+                    matcher = getToken.Find()
+                    ' Acts like yield, getToken has next match ready to go
+                    Return New Token(captureType, matched)
+                End If 
+            Next
+            matcher = getToken.Find()
+        Wend
+        Return New Token(TokenType.TEXT_EOF, "")
+    End Method
+End Type
+
+Type Parser
+    Field lexer:Lexer
+    Field currTok:Token
+    
+    Method New(lexer:Lexer)
+        Self.lexer = lexer
+        currTok = lexer.NextToken()
+    End Method
+
+    Method match:byte(tt:TokenType)
+        return tt = currTok.typ
+    End Method
+    
+    Method error()
+        Local bullshit:String  = "Unexpected current token: " + currTok.toString()
+        RuntimeError bullshit
+    End Method
+
+    Method accept:Token()
+        Local tempTok:Token = currTok
+        currTok = lexer.NextToken()
+        Return tempTok
+    End Method
+        
+    Method parse:Double()
+        If match(TokenType.NUMBER) Then Return parseNumber()
+        If match(TokenType.SYMBOL) Then Return parseSymbol()
+        If match(TokenType.LPAREN) 
+            accept() ' Tossing left paren
+            Return parseList()
+        End If 
+        If match(TokenType.QUOTE)
+            accept() ' Toss quote
+            Return parseQuote()    
+        End If
+        error()
+    End Method
+        
+    Method parseNumber:Double()
+        Local numTok:Token = accept()
+        Return num(Double(numTok.value))
+    End Method
+    
+    Method parseSymbol:Double()
+        Local symTok:Token = accept()
+        Return atom(symTok.value)
+     End Method
+
+    Method parseList:Double()
+        Local expr:Double
+
+        If match(TokenType.RPAREN)
+            accept() ' Tosses right paren
+            Return nil_val
+        End If
+        If match(TokenType.LDOT)
+            accept() ' Tosses the LDOT
+            expr:Double = parse()
+            If match(TokenType.RPAREN)
+                accept()
+            Else
+                error()
+            End If 
+            Return expr
+        End If
+        expr:Double = parse()
+        Return cons(expr, parseList())
+    End method
+
+    Method parseQuote:Double()
+        Return cons(atom("quote"), cons(parse(), nil_val))
+    End Method
+    
 End Type
 
 ' ----------------------------------------------------------------------------
 
+Function nan_main:Int()
+    Print "Starting B-LISP"
+    nil_val = box(NIL_TAG, 0)
+    err_val = atom("ERR")
+    tru_val = atom("#t")
+    env_val = pair(tru_val, tru_val, nil_val)
+    For Local i:ULong = 0 Until prim.Length
+        env_val = pair(atom(prim[i].s), box(PRIM_TAG, i), env_val)
+    Next
+    
+    Local val_a:Double = num(64)
+    Local val_b:Double = num(36)    
+    For Local op:String = EachIn ["*", "/", "+", "-"]
+        Local expr:Double = cons(atom(op), cons(val_a, cons(val_b, nil_val)))
+        Print "Doing the function: " + op + " with values: a: " + val_a + " b: " + val_b
+        Print "Result is : " + eval(expr, env_val)
+    Next
 
+    Local subLis:Double = cons(box(PRIM_TAG, 6), cons(22, cons(32, nil_val)))
+    Local sexp:Double = cons(box(PRIM_TAG, 5), cons(22, cons(subLis, cons(42, nil_val))))
+    Print ""
+    lispPrint(sexp)
+    Print "~n"
+    prin ">>>" + eval(sexp, env_val)
+    Return 0
+End Function
 
-' ----------------------------------------------------------------------------
+Function lexer_main()
+    Local statements:String = """
+        (* (+ FOO *BAR* +BAZ+) |foobar| BAZ 42 43.5)
+        `(,SYM ,@(1 2 3 4))
+        '(3 . 4)
+"""
+    Local lexer:Lexer = New Lexer(makeRegexTableBlisp(), statements)
+    
+    Local nextToken:Token = lexer.NextToken() 
+    While nextToken.typ <> TokenType.TEXT_EOF 
+        nextToken.Print()
+        nextToken = lexer.NextToken()
+    Wend
+    nextToken.Print()
+
+    
+End function
+
+Function parser_main()
+    Local ret:Double
+    Print "Starting B-LISP"
+
+    nil_val = box(NIL_TAG, 0) ' TODO make roots in real GC
+    quit_val = box(NIL_TAG, 0) ' TODO make roots in real GC
+    
+    err_val = atom("ERR") ' TODO make roots in real GC
+    tru_val = atom("#t") ' TODO make roots in real GC
+    env_val = pair(tru_val, tru_val, nil_val) ' TODO make roots in real GC
+
+    For Local i:ULong = 0 Until prim.Length
+        env_val = pair(atom(prim[i].s), box(PRIM_TAG, i), env_val)
+    Next
+    
+    Repeat 
+        ' READ
+        Local cellsUsed:ulong = N - sp
+        Local cellsRemaining:ulong = sp - ceil(hp / 8.0)
+        Local prompt:String = "B-LISP[" + cellsUsed + "/" + cellsRemaining + "]> "
+        
+        Local statements:String = Input(prompt)
+        Local lexer:Lexer = New Lexer(makeRegexTableBlisp(), statements)
+        Local parser:Parser = New Parser(lexer)
+        Local sexp:Double = parser.parse()
+        Print "Parsed Lisp Object~n"
+        lispPrint(sexp)
+        Print "~n"
+
+        ' EVAL
+        ret = eval(sexp, env_val)
+
+        ' PRINT
+        Print "Eval'd Lisp Object~n"
+        lispPrint(ret)
+        Print "~n"
+        gc()
+    Until equ(ret, quit_val)
+End function
 
 Function main()
-	Print "In main ..."
-	Local statements:String = """
-		(* (+ FOO *BAR* +BAZ+) |foobar| BAZ 42 43.5)
-		`(,SYM ,@(1 2 3 4))
-		'(3 . 4)
-"""
-	Local lexer:Lexer = New Lexer(makeRegexTableBlisp(), statements)
-	
-	Local nextToken:Token = lexer.NextToken() 
-	While nextToken.typ <> TokenType.TEXT_EOF 
-		nextToken.Print()
-		nextToken = lexer.NextToken()
-	Wend
-	nextToken.Print()
+'    nan_main()
+'    lexer_main()
+    parser_main()
 End Function
 
 main()
