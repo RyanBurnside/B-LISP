@@ -1,5 +1,6 @@
 
 SuperStrict
+
 Import brl.retro
 Import text.format
 Import Text.RegEx
@@ -20,7 +21,7 @@ Enum TokenType
     TEXT_EOF
 End Enum
 
-' NaN box constant "tags"
+' NaN box constant "tags" For encoding into doubles
 Const ATOM_TAG:ULong = $7ff8  'atom
 Const PRIM_TAG:ULong = $7ff9  'primitive
 Const CONS_TAG:ULong = $7ffa  'cons cell
@@ -33,6 +34,7 @@ Global sp:ULong = N ' stack pointer
 Global cell:Double[N]
 
 ' These will get populated in main()
+' They stand For literal values 
 Global nil_val:Double
 Global quit_val:Double
 Global tru_val:Double 
@@ -47,6 +49,7 @@ Function prin(s:String)
     StandardIOStream.WriteString s
 End Function
 
+' Printable versions of our NaN boxing constants
 Function tagToString:String(tag:ULong)
     Select tag
     Case ATOM_TAG Return "ATOM"
@@ -209,10 +212,10 @@ End Function
 '   (cons x y)          construct pair (x . y)
 '   (car p)             car of pair p
 '   (cdr p)             cdr of pair p
-'   (add n1 n2 ... nk)  sum of n1 to nk
-'   (sub n1 n2 ... nk)  n1 minus sum of n2 to nk
-'   (mul n1 n2 ... nk)  product of n1 to nk
-'   (div n1 n2 ... nk)  n1 divided by the product of n2 to nk
+'   (+ n1 n2 ... nk)  sum of n1 to nk
+'   (- n1 n2 ... nk)  n1 minus sum of n2 to nk
+'   (* n1 n2 ... nk)  product of n1 to nk
+'   (/ n1 n2 ... nk)  n1 divided by the product of n2 to nk
 '   (int n)             integer part of n
 '   (< n1 n2)           #t if n1<n2, otherwise ()
 '   (eq? x y)           #t if x equals y, otherwise ()
@@ -308,13 +311,37 @@ End Function
 
 Function f_lt:Double(t:Double, e:Double)
     t = evlis(t, e)
-    If car(t) - car(cdr(t)) < 0 Then Return tru_val
+    If car(t) = car(cdr(t)) Then Return tru_val
     Return nil_val
 End Function
 
 Function f_eq:Double(t:Double, e:Double)
     t = evlis(t, e)
     If equ(car(t), car(cdr(t))) Then Return tru_val
+    Return nil_val
+End Function
+
+Function f_not_eq:Double(t:Double, e:Double)
+    t = evlis(t, e)
+    If car(t) <> car(cdr(t)) Then Return tru_val
+    Return nil_val
+End Function
+
+Function f_lteq:Double(t:Double, e:Double)
+    t = evlis(t, e)
+    If car(t) <= car(cdr(t)) Then Return tru_val
+    Return nil_val
+End Function
+
+Function f_gt:Double(t:Double, e:Double)
+    t = evlis(t, e)
+    If car(t) > car(cdr(t)) Then Return tru_val
+    Return nil_val
+End Function
+
+Function f_gteq:Double(t:Double, e:Double)
+    t = evlis(t, e)
+    If car(t) >= car(cdr(t)) Then Return tru_val
     Return nil_val
 End Function
 
@@ -388,6 +415,7 @@ Type fnPointer
     End Method
 End Type
 
+' Given a symbol Return the Function it represents
 Global prim:fnPointer[] = [ ..
 New fnPointer("eval",   f_eval),
 New fnPointer("quote",  f_quote),
@@ -399,8 +427,12 @@ New fnPointer("-",      f_sub),
 New fnPointer("*",      f_mul),
 New fnPointer("/",      f_div),
 New fnPointer("int",    f_int),
-New fnPointer("<",      f_lt),
-New fnPointer("eq?",    f_eq),
+New fnPointer("<",      f_lt),    ' TODO variadic
+New fnPointer("<=",     f_lteq),  ' TODO variadic
+New fnPointer(">",      f_gt),    ' TODO variadic
+New fnPointer(">=",     f_gteq),  ' TODO variadic
+New fnPointer("/=",     f_not_eq),' TODO variadic
+New fnPointer("eq?",    f_eq),    ' TODO variadic
 New fnPointer("or",     f_or),
 New fnPointer("and",    f_and),
 New fnPointer("not",    f_not),
@@ -409,7 +441,7 @@ New fnPointer("if",     f_if),
 New fnPointer("let*",   f_leta),
 New fnPointer("lambda", f_lambda),
 New fnPointer("define", f_define),
-New fnPointer("quit", f_quit)]
+New fnPointer("quit",   f_quit)]
 
 ' create environment by extending e with the variables v bount to values t
 
@@ -476,9 +508,11 @@ Function lispPrint(x:Double)
     End Select
 End Function
 
+' Yeah, this isn't going to stick around Forever. :D
 Function gc()
     sp = ord(env_val)
 End Function
+
 
 Function debugPrint(x:Double)
     Local val:ULong
@@ -603,16 +637,17 @@ Type Token
 End Type
 
 ' This is the regex table (to be transformed) for B-LISP
+' Order matters, preference is given For earlier matches
 Function makeRegexTableBlisp:String[][] ()
     ' Regex groups, order by most specific to least
     Return [["NUMBER",    "[-+]?\d+(\.\d*)?"],
-            ["SYMBOL",    "[A-Za-z!@#$%^&*\-+\\<>]+"],
+            ["SYMBOL",    "[A-Za-z!@#$%^&*\-+\\<>/?=]+"],
             ["BACKQUOTE", "`"],
             ["SPLICE",    ",@"],
             ["COMMA",     ","],
             ["QUOTE",     "'"],
-            ["LPAREN",    "\("],
-            ["RPAREN",    "\)"],
+            ["LPAREN",    "[\(]"],
+            ["RPAREN",    "[\)]"],
             ["LDOT",       "\."],
             ["SKIP",      "[ \t\n]+"],
             ["ERROR",     "[^ \t\n]+"]]
@@ -640,6 +675,7 @@ Function RegexTableToRegex:TRegEx(regexTable:String[][])
     Return TRegEx.Create("|".join(temp))
 End Function
 
+' Used To turn regex matches into tokens For the Parser
 Type Lexer
     ' Regex Class
     Field getToken:TRegEx
@@ -675,6 +711,7 @@ Type Lexer
     End Method
 End Type
 
+' Parses tokens into low level BlitzMax operations on memory chunk
 Type Parser
     Field lexer:Lexer
     Field currTok:Token
@@ -689,8 +726,7 @@ Type Parser
     End Method
     
     Method error()
-        Local bullshit:String  = "Unexpected current token: " + currTok.toString()
-        RuntimeError bullshit
+        RuntimeError "Unexpected current token: " + currTok.toString()
     End Method
 
     Method accept:Token()
@@ -730,6 +766,7 @@ Type Parser
             accept() ' Tosses right paren
             Return nil_val
         End If
+        
         If match(TokenType.LDOT)
             accept() ' Tosses the LDOT
             expr:Double = parse()
@@ -740,6 +777,7 @@ Type Parser
             End If 
             Return expr
         End If
+        
         expr:Double = parse()
         Return cons(expr, parseList())
     End method
@@ -749,8 +787,6 @@ Type Parser
     End Method
     
 End Type
-
-' ----------------------------------------------------------------------------
 
 Function nan_main:Int()
     Print "Starting B-LISP"
@@ -782,6 +818,7 @@ End Function
 Function lexer_main()
     Local statements:String = """
         (* (+ FOO *BAR* +BAZ+) |foobar| BAZ 42 43.5)
+        (/ 3 4)
         `(,SYM ,@(1 2 3 4))
         '(3 . 4)
 """
@@ -793,19 +830,17 @@ Function lexer_main()
         nextToken = lexer.NextToken()
     Wend
     nextToken.Print()
-
-    
 End function
 
 Function parser_main()
     Local ret:Double
     Print "Starting B-LISP"
 
-    nil_val = box(NIL_TAG, 0) ' TODO make roots in real GC
-    quit_val = box(NIL_TAG, 0) ' TODO make roots in real GC
+    nil_val = box(NIL_TAG, 0)                 ' TODO make roots in real GC
+    quit_val = box(NIL_TAG, 1)                ' TODO make roots in real GC
     
-    err_val = atom("ERR") ' TODO make roots in real GC
-    tru_val = atom("#t") ' TODO make roots in real GC
+    err_val = atom("ERR")                     ' TODO make roots in real GC
+    tru_val = atom("#t")                      ' TODO make roots in real GC
     env_val = pair(tru_val, tru_val, nil_val) ' TODO make roots in real GC
 
     For Local i:ULong = 0 Until prim.Length
