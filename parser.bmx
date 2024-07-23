@@ -10,7 +10,7 @@ Const CONS_TAG:ULong = $7ffa  'cons cell
 Const CLOS_TAG:ULong = $7ffb  'closure
 Const NIL_TAG:ULong  = $7ffc  'duh
 
-Enum TokenType 
+Enum TokenType
 	SYMBOL,
 	NUMBER,
 	BACKQUOTE,

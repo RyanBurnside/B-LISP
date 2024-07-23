@@ -1,4 +1,3 @@
-
 SuperStrict
 
 Import brl.retro
@@ -28,10 +27,11 @@ Const CONS_TAG:ULong = $7ffa  'cons cell
 Const CLOS_TAG:ULong = $7ffb  'closure
 Const NIL_TAG:ULong  = $7ffc  'duh
 
-Global N:UInt = 1024 ' number of Lisp objects (doubles) to store for the VM
+Global N:UInt =  1024 * 1024 * 5 ' number of Lisp objects (doubles) to store
 Global hp:ULong = 0 ' heap pointer
 Global sp:ULong = N ' stack pointer
 Global cell:Double[N]
+
 
 ' These will get populated in main()
 ' They stand For literal values 
@@ -234,6 +234,10 @@ End Function
 '   (lambda v x)        construct a closure
 '   (define v x)        define a named value globally
 
+
+
+' the f_ series of functions get a parameter list (t or tt) and environment
+' we can't use t because we defined T() to get the tag earlier. BlitzMax folks...
 Function f_eval:Double(tt:Double, e:Double)
     Return eval(car(evlis(tt, e)), e)
 End Function
@@ -311,7 +315,7 @@ End Function
 
 Function f_lt:Double(t:Double, e:Double)
     t = evlis(t, e)
-    If car(t) = car(cdr(t)) Then Return tru_val
+    If car(t) < car(cdr(t)) Then Return tru_val
     Return nil_val
 End Function
 
@@ -360,7 +364,7 @@ Function f_or:Double(tt:Double, e:Double)
     Return x    
 End Function
 
-Function f_and:Double(tt:Double, e:Double) ' double check
+Function f_and:Double(tt:Double, e:Double)
     Local x:Double = nil_val
     While T(tt) <> NIL_TAG
         x = eval(car(tt), e)
@@ -370,18 +374,23 @@ Function f_and:Double(tt:Double, e:Double) ' double check
     Return x
 End Function
 
-Function f_cond:Double(tt:Double, e:Double) ' double check
+Function f_cond:Double(tt:Double, e:Double)
     While T(tt) <> NIL_TAG And lispNot(eval(car(car(tt)), e))
         tt = cdr(tt)
     Wend
     Return eval(car(cdr(car(tt))), e)
 End Function
 
-Function f_if:Double(tt:Double, e:Double) ' double check
-    Local pred:Double = lispNot(eval(car(tt), e))
-    Local answer:Double = tt
-    If pred Then answer = cdr(tt)
-    Return eval(car(cdr(answer)), e)
+' Deviation from TinyLisp, Emacs' style long else
+Function f_if:Double(tt:Double, e:Double)
+    Local pred:Double = eval(car(tt), e)
+    Local rest_exps:Double = cdr(tt)
+    Local true_exp:Double = car(rest_exps)
+    Local false_exps:Double = cdr(rest_exps)
+    If Not lispNot(pred) ' anything but NIL/'()
+        Return eval(true_exp, e)
+    End If
+    Return f_progn(false_exps, e) 'eval else expressions
 End Function
 
 Function f_leta:Double(tt:Double, e:Double)
@@ -392,8 +401,39 @@ Function f_leta:Double(tt:Double, e:Double)
     Return eval(car(tt), e)
 End Function
 
-Function f_lambda:Double(tt:Double, e:Double) ' double check
+Function f_lambda:Double(tt:Double, e:Double)
     Return closure(car(tt), car(cdr(tt)), e)
+End Function
+
+Function f_progn:Double(tt:Double, e:Double)
+    Local result:Double = nil_val
+    While Not lispNot(tt)
+        result = eval(car(tt), e)
+        tt = cdr(tt)
+    Wend
+    Return result
+End Function
+
+Function f_prog1:Double(tt:Double, e:Double)
+    Local result:Double = nil_val
+    Local counter:Int = 0
+    While Not lispNot(tt)
+        If counter = 0 Then result = eval(car(tt), e)
+        tt = cdr(tt)
+        counter :+ 1
+    Wend
+    Return result
+End Function
+
+Function f_prog2:Double(tt:Double, e:Double)
+    Local result:Double = nil_val
+    Local counter:Int = 0
+    While Not lispNot(tt)
+        If counter = 1 Then result = eval(car(tt), e)
+        tt = cdr(tt)
+        counter :+ 1
+    Wend
+    Return result
 End Function
 
 Function f_define:Double(tt:Double, e:Double)
@@ -441,6 +481,9 @@ New fnPointer("if",     f_if),
 New fnPointer("let*",   f_leta),
 New fnPointer("lambda", f_lambda),
 New fnPointer("define", f_define),
+New fnPointer("progn",  f_progn),
+New fnPointer("prog1",  f_prog1),
+New fnPointer("prog2",  f_prog2),
 New fnPointer("quit",   f_quit)]
 
 ' create environment by extending e with the variables v bount to values t
@@ -625,14 +668,14 @@ Type Token
         Self.value = value
     End Method
     
-    Method toString:String()
+    Method ToString:String()
         formatter.Clear()
         formatter.Arg(typ.ToString()).Arg(Int(typ)).Arg(value)
         Return formatter.format()
     End Method
 
     Method Print()
-        Print Self.toString()
+        Print Self.ToString()
     End Method
 End Type
 
@@ -641,14 +684,14 @@ End Type
 Function makeRegexTableBlisp:String[][] ()
     ' Regex groups, order by most specific to least
     Return [["NUMBER",    "[-+]?\d+(\.\d*)?"],
-            ["SYMBOL",    "[A-Za-z!@#$%^&*\-+\\<>/?=]+"],
+            ["SYMBOL",    "[0-9A-Za-z!@#$%^&*\-+\\<>/?=]+"],
             ["BACKQUOTE", "`"],
             ["SPLICE",    ",@"],
             ["COMMA",     ","],
             ["QUOTE",     "'"],
             ["LPAREN",    "[\(]"],
             ["RPAREN",    "[\)]"],
-            ["LDOT",       "\."],
+            ["LDOT",      "\."],
             ["SKIP",      "[ \t\n]+"],
             ["ERROR",     "[^ \t\n]+"]]
 End Function
@@ -721,12 +764,12 @@ Type Parser
         currTok = lexer.NextToken()
     End Method
 
-    Method match:byte(tt:TokenType)
-        return tt = currTok.typ
+    Method match:Byte(tt:TokenType)
+        Return tt = currTok.typ
     End Method
     
     Method error()
-        RuntimeError "Unexpected current token: " + currTok.toString()
+        RuntimeError "Unexpected current token: " + currTok.ToString()
     End Method
 
     Method accept:Token()
@@ -770,22 +813,17 @@ Type Parser
         If match(TokenType.LDOT)
             accept() ' Tosses the LDOT
             expr:Double = parse()
-            If match(TokenType.RPAREN)
-                accept()
-            Else
-                error()
-            End If 
+            If match(TokenType.RPAREN) Then accept Else error
             Return expr
         End If
         
         expr:Double = parse()
         Return cons(expr, parseList())
-    End method
+    End Method
 
     Method parseQuote:Double()
         Return cons(atom("quote"), cons(parse(), nil_val))
     End Method
-    
 End Type
 
 Function nan_main:Int()
@@ -830,7 +868,7 @@ Function lexer_main()
         nextToken = lexer.NextToken()
     Wend
     nextToken.Print()
-End function
+End Function
 
 Function parser_main()
     Local ret:Double
@@ -846,31 +884,33 @@ Function parser_main()
     For Local i:ULong = 0 Until prim.Length
         env_val = pair(atom(prim[i].s), box(PRIM_TAG, i), env_val)
     Next
-    
+
     Repeat 
         ' READ
-        Local cellsUsed:ulong = N - sp
-        Local cellsRemaining:ulong = sp - ceil(hp / 8.0)
+        Local cellsUsed:ULong = N - sp
+        Local cellsRemaining:ULong = sp - Ceil(hp / 8.0)
         Local prompt:String = "B-LISP[" + cellsUsed + "/" + cellsRemaining + "]> "
         
-        Local statements:String = Input(prompt)
+        Local statements:String = Input(prompt).Trim()
         Local lexer:Lexer = New Lexer(makeRegexTableBlisp(), statements)
         Local parser:Parser = New Parser(lexer)
         Local sexp:Double = parser.parse()
-        Print "Parsed Lisp Object~n"
+        prin "Parsed Lisp Object: "
         lispPrint(sexp)
-        Print "~n"
+        Print ""
 
         ' EVAL
+        Local start:Int = MilliSecs()
         ret = eval(sexp, env_val)
+        Print "MilliSecs: " + (MilliSecs() - start)
 
         ' PRINT
-        Print "Eval'd Lisp Object~n"
+        Print ""
         lispPrint(ret)
-        Print "~n"
+        Print ""
         gc()
     Until equ(ret, quit_val)
-End function
+End Function
 
 Function main()
 '    nan_main()
