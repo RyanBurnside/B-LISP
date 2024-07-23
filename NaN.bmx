@@ -226,7 +226,7 @@ End Function
 '         (x2 y2)
 '         ...
 '         (xk yk))      the first yi for which xi evaluates to non-()
-'   (if x y z)          if x is non-() then y else z
+'   (if x y z ... z<n>)          if x is non-() then y else z exps
 '   (let* (v1 x1)
 '         (v2 x2)
 '         ...
