@@ -1,5 +1,7 @@
 # B-LISP
 
+Note: B-LISP is currently a work in progress. Heavily subject to change.
+
 The primary goal of B-LISP is to look and act like a heritage Lisp. Hence the old-style name capitalization.
 
 It's a learning project that may grow into more.
