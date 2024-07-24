@@ -420,7 +420,6 @@ Function f_let_star:Double(tt:Double, e:Double)
         
         binding_list = cdr(binding_list)
     Wend
-    Print "Finished processing bindings"
     Return f_progn(sexps, e)
 End Function
 
@@ -429,8 +428,6 @@ Function f_lambda:Double(tt:Double, e:Double)
 End Function
 
 Function f_progn:Double(tt:Double, e:Double)
-    prin "f_progn got: "
-    lispPrint(tt)
     Print ""
     Local result:Double = nil_val
     While Not lispNot(tt)
