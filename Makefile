@@ -2,7 +2,7 @@
 
 BMK = bmk
 
-all: NaN
+all: B-LISP
 
-NaN: NaN.bmx
-	$(BMK) makeapp -w NaN.bmx
+B-LISP: B-LISP.bmx
+	$(BMK) makeapp -w B-LISP.bmx

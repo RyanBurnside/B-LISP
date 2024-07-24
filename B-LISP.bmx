@@ -32,7 +32,6 @@ Global hp:ULong = 0 ' heap pointer
 Global sp:ULong = N ' stack pointer
 Global cell:Double[N]
 
-
 ' These will get populated in main()
 ' They stand For literal values 
 Global nil_val:Double
@@ -189,6 +188,7 @@ Function lispNot:ULong(x:Double)
     Return T(x) = NIL_TAG
 End Function
 
+' TODO REMOVE this trash once proper LET is formed
 ' let(x) is nonzero if x is a Lisp let/let* pair
 Function let:ULong(x:Double)
     Return T(x) <> NIL_TAG  And (Not lispNot(cdr(x)))
@@ -234,8 +234,6 @@ End Function
 '   (lambda v x)        construct a closure
 '   (define v x)        define a named value globally
 
-
-
 ' the f_ series of functions get a parameter list (t or tt) and environment
 ' we can't use t because we defined T() to get the tag earlier. BlitzMax folks...
 Function f_eval:Double(tt:Double, e:Double)
@@ -247,7 +245,12 @@ Function f_quote:Double(tt:Double, _:Double)
 End Function
 
 Function f_cons:Double(tt:Double, e:Double)
+    tt = evlis(tt, e)
     Return cons(car(tt), car(cdr(tt)))
+End Function
+
+Function f_list:Double(tt:Double, e:Double)
+    Return evlis(tt, e)
 End Function
 
 Function f_car:Double(tt:Double, e:Double)
@@ -401,11 +404,34 @@ Function f_leta:Double(tt:Double, e:Double)
     Return eval(car(tt), e)
 End Function
 
+' List ex: ((foo (bar 21) (baz 34)) <expr> ... <expr n>)
+Function f_let_star:Double(tt:Double, e:Double)
+    Local binding_list:double = car(tt)
+    Local sexps:double = cdr(tt)
+    
+    While Not LispNot(binding_list)
+        Local current_binding:Double = car(binding_list)
+        ' If symbol, bind symbol To nil And add.
+        If T(current_binding) = ATOM_TAG
+            e = pair(current_binding, nil_val, e)
+        Else ' use the car And cadr of the pair
+            e = pair(car(current_binding), eval(car(cdr(current_binding)), e), e)
+        End if
+        
+        binding_list = cdr(binding_list)
+    Wend
+    Print "Finished processing bindings"
+    Return f_progn(sexps, e)
+End Function
+
 Function f_lambda:Double(tt:Double, e:Double)
     Return closure(car(tt), car(cdr(tt)), e)
 End Function
 
 Function f_progn:Double(tt:Double, e:Double)
+    prin "f_progn got: "
+    lispPrint(tt)
+    Print ""
     Local result:Double = nil_val
     While Not lispNot(tt)
         result = eval(car(tt), e)
@@ -457,34 +483,37 @@ End Type
 
 ' Given a symbol Return the Function it represents
 Global prim:fnPointer[] = [ ..
-New fnPointer("eval",   f_eval),
-New fnPointer("quote",  f_quote),
-New fnPointer("cons",   f_cons),
-New fnPointer("car",    f_car),
-New fnPointer("cdr",    f_cdr),
-New fnPointer("+",      f_add),
-New fnPointer("-",      f_sub),
-New fnPointer("*",      f_mul),
-New fnPointer("/",      f_div),
-New fnPointer("int",    f_int),
-New fnPointer("<",      f_lt),    ' TODO variadic
-New fnPointer("<=",     f_lteq),  ' TODO variadic
-New fnPointer(">",      f_gt),    ' TODO variadic
-New fnPointer(">=",     f_gteq),  ' TODO variadic
-New fnPointer("/=",     f_not_eq),' TODO variadic
-New fnPointer("eq?",    f_eq),    ' TODO variadic
-New fnPointer("or",     f_or),
-New fnPointer("and",    f_and),
-New fnPointer("not",    f_not),
-New fnPointer("cond",   f_cond),
-New fnPointer("if",     f_if),
-New fnPointer("let*",   f_leta),
-New fnPointer("lambda", f_lambda),
-New fnPointer("define", f_define),
-New fnPointer("progn",  f_progn),
-New fnPointer("prog1",  f_prog1),
-New fnPointer("prog2",  f_prog2),
-New fnPointer("quit",   f_quit)]
+New fnPointer("eval",     f_eval),
+New fnPointer("quote",    f_quote),
+New fnPointer("cons",     f_cons),
+New fnPointer("list",     f_list),
+New fnPointer("car",      f_car),
+New fnPointer("cdr",      f_cdr),
+New fnPointer("+",        f_add),
+New fnPointer("-",        f_sub),
+New fnPointer("*",        f_mul),
+New fnPointer("/",        f_div),
+New fnPointer("int",      f_int),
+New fnPointer("<",        f_lt),    ' TODO variadic
+New fnPointer("<=",       f_lteq),  ' TODO variadic
+New fnPointer(">",        f_gt),    ' TODO variadic
+New fnPointer(">=",       f_gteq),  ' TODO variadic
+New fnPointer("/=",       f_not_eq),' TODO variadic
+New fnPointer("eq?",      f_eq),    ' TODO variadic
+New fnPointer("or",       f_or),
+New fnPointer("and",      f_and),
+New fnPointer("not",      f_not),
+New fnPointer("cond",     f_cond),
+New fnPointer("if",       f_if),
+New fnPointer("bad-let*", f_leta),
+New fnPointer("let",      f_leta),
+New fnPointer("let*",     f_let_star),
+New fnPointer("lambda",   f_lambda),
+New fnPointer("define",   f_define),
+New fnPointer("progn",    f_progn),
+New fnPointer("prog1",    f_prog1),
+New fnPointer("prog2",    f_prog2),
+New fnPointer("quit",     f_quit)]
 
 ' create environment by extending e with the variables v bount to values t
 
@@ -635,7 +664,6 @@ Function dump()
     Print buffer
     GCResume()
 End Function
-
 
 ' this needs To be taken out later as Parser.bmx
 
@@ -872,7 +900,7 @@ End Function
 
 Function parser_main()
     Local ret:Double
-    Print "Starting B-LISP"
+    Print "Welcome to B-LISP."
 
     nil_val = box(NIL_TAG, 0)                 ' TODO make roots in real GC
     quit_val = box(NIL_TAG, 1)                ' TODO make roots in real GC
