@@ -188,12 +188,6 @@ Function lispNot:ULong(x:Double)
     Return T(x) = NIL_TAG
 End Function
 
-' TODO REMOVE this trash once proper LET is formed
-' let(x) is nonzero if x is a Lisp let/let* pair
-Function let:ULong(x:Double)
-    Return T(x) <> NIL_TAG  And (Not lispNot(cdr(x)))
-End Function
-
 ' return a new list of evaluated Lisp expresions t in the environment e
 Function evlis:Double(tag:Double, e:Double)
     Select T(tag)
@@ -206,36 +200,6 @@ Function evlis:Double(tag:Double, e:Double)
     End Select
 End Function
 
-' Lisp primitives:
-'   (eval x)            return evaluated x (such as when x was quoted)
-'   (quote x)           special form, returns x unevaluated "as is"
-'   (cons x y)          construct pair (x . y)
-'   (car p)             car of pair p
-'   (cdr p)             cdr of pair p
-'   (+ n1 n2 ... nk)  sum of n1 to nk
-'   (- n1 n2 ... nk)  n1 minus sum of n2 to nk
-'   (* n1 n2 ... nk)  product of n1 to nk
-'   (/ n1 n2 ... nk)  n1 divided by the product of n2 to nk
-'   (int n)             integer part of n
-'   (< n1 n2)           #t if n1<n2, otherwise ()
-'   (eq? x y)           #t if x equals y, otherwise ()
-'   (not x)             #t if x is (), otherwise ()
-'   (or x1 x2 ... xk)   first x that is not (), otherwise ()
-'   (and x1 x2 ... xk)  last x if all x are not (), otherwise ()
-'   (cond (x1 y1)
-'         (x2 y2)
-'         ...
-'         (xk yk))      the first yi for which xi evaluates to non-()
-'   (if x y z ... z<n>)          if x is non-() then y else z exps
-'   (let* (v1 x1)
-'         (v2 x2)
-'         ...
-'         y)            sequentially binds each variable v1 to xi to evaluate y
-'   (lambda v x)        construct a closure
-'   (define v x)        define a named value globally
-
-' the f_ series of functions get a parameter list (t or tt) and environment
-' we can't use t because we defined T() to get the tag earlier. BlitzMax folks...
 Function f_eval:Double(tt:Double, e:Double)
     Return eval(car(evlis(tt, e)), e)
 End Function
@@ -423,6 +387,42 @@ Function f_let_star:Double(tt:Double, e:Double)
     Return f_progn(sexps, e)
 End Function
 
+' List ex: ((foo (bar 21) (baz 34)) <expr> ... <expr n>)
+Function f_let:Double(tt:Double, e:Double)
+    Local binding_list:double = car(tt)
+    Local sexps:double = cdr(tt)
+    Local cons_list:Double = nil_val
+    While Not LispNot(binding_list)
+        Local current_binding:Double = car(binding_list)
+        ' If symbol, bind symbol To nil And add.
+        If T(current_binding) = ATOM_TAG
+            cons_list = cons(cons(current_binding, nil_val), cons_list)
+        Else ' use the car And cadr of the pair
+            cons_list = cons(cons(car(current_binding),
+                             eval(car(cdr(current_binding)), e)), cons_list)
+        End if
+
+        binding_list = cdr(binding_list)
+    Wend
+
+    While Not lispNot(cons_list)
+        Local cur_pair:double = car(cons_list)
+        e = pair(car(cur_pair), cdr(cur_pair), e)
+        cons_list = cdr(cons_list)
+    Wend
+
+    Return f_progn(sexps, e)
+End Function
+
+' Prints all items provided
+Function f_print:Double(tt:Double, e:Double)
+    While Not lispNot(tt)
+        lispPrint(eval(car(tt), e))
+        tt = cdr(tt)
+    Wend
+    Return nil_val
+End Function
+
 Function f_lambda:Double(tt:Double, e:Double)
     Return closure(car(tt), car(cdr(tt)), e)
 End Function
@@ -502,13 +502,14 @@ New fnPointer("and",      f_and),
 New fnPointer("not",      f_not),
 New fnPointer("cond",     f_cond),
 New fnPointer("if",       f_if),
-New fnPointer("let",      f_leta), ' TODO fix To be like let*
+New fnPointer("let",      f_let),
 New fnPointer("let*",     f_let_star),
 New fnPointer("lambda",   f_lambda),
 New fnPointer("define",   f_define),
 New fnPointer("progn",    f_progn),
 New fnPointer("prog1",    f_prog1),
 New fnPointer("prog2",    f_prog2),
+New fnPointer("print",    f_print),
 New fnPointer("quit",     f_quit)]
 
 ' create environment by extending e with the variables v bount to values t
@@ -924,9 +925,9 @@ Function parser_main()
         Print ""
 
         ' EVAL
-        Local start:Int = MilliSecs()
+        ' Local start:Int = MilliSecs()
         ret = eval(sexp, env_val)
-        Print "MilliSecs: " + (MilliSecs() - start)
+        ' Print "MilliSecs: " + (MilliSecs() - start)
 
         ' PRINT
         Print ""
