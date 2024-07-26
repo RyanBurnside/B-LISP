@@ -132,7 +132,7 @@ Function atom:Double(s:String)
 End Function
 
 ' construct pair (x . y) returns a NaN-boxed CONS_TAG
-Function cons:Double(x:Double, y:Double)
+Function cons:Double(x:Double, y:Double) Inline
     sp :- 1
     cell[sp] = x
     sp :- 1
@@ -146,7 +146,7 @@ Function cons:Double(x:Double, y:Double)
 End Function
 
 ' return the car of the pair or ERR if not a pair
-Function car:Double(p:Double)
+Function car:Double(p:Double) Inline
     If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
         Return cell[ord(p) + 1]
     End If
@@ -154,7 +154,7 @@ Function car:Double(p:Double)
 End Function
 
 ' return the cdr of the pair or ERR if not a pair
-Function cdr:Double(p:Double)
+Function cdr:Double(p:Double) Inline
     If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
         Return cell[ord(p)]
     End If
@@ -162,12 +162,12 @@ Function cdr:Double(p:Double)
 End Function
 
 ' construct a pair to add to environment e, returns the list ((v . x) . e)
-Function pair:Double(v:Double, x:Double, e:Double)
+Function pair:Double(v:Double, x:Double, e:Double) Inline
     Return cons(cons(v, x), e)
 End Function
 
 ' construct a closure, returns a NaN-boxed CLOS_TAG
-Function closure:Double(v:Double, x:Double, e:Double)
+Function closure:Double(v:Double, x:Double, e:Double) Inline
     '  return box(CLOS,ord(pair(v,x,equ(e,env) ? nil : e))); }
     Local env:Double
     If equ(e, env_val) Then env = nil_val Else env = e
@@ -175,7 +175,7 @@ Function closure:Double(v:Double, x:Double, e:Double)
 End Function
 
 ' look up a symbol in an environment, return its value or err if not found
-Function assoc:Double(v:Double, e:Double)
+Function assoc:Double(v:Double, e:Double) Inline
     While T(e) = CONS_TAG And (Not equ(v, car(car(e))))
         e = cdr(e)
     Wend
@@ -184,12 +184,12 @@ Function assoc:Double(v:Double, e:Double)
 End Function
 
 ' lispNot(x) is nonzero if x is the lisp () empty list
-Function lispNot:ULong(x:Double)
+Function lispNot:ULong(x:Double) Inline
     Return T(x) = NIL_TAG
 End Function
 
 ' return a new list of evaluated Lisp expresions t in the environment e
-Function evlis:Double(tag:Double, e:Double)
+Function evlis:Double(tag:Double, e:Double) Inline
     Select T(tag)
     Case CONS_TAG 
         Return cons(eval(car(tag), e), evlis(cdr(tag), e))
@@ -200,28 +200,30 @@ Function evlis:Double(tag:Double, e:Double)
     End Select
 End Function
 
-Function f_eval:Double(tt:Double, e:Double)
+' these f_ prefixed functions get called in the Function lookup table
+' tt is a parameters list, e is the global environment
+Function f_eval:Double(tt:Double, e:Double) Inline
     Return eval(car(evlis(tt, e)), e)
 End Function
 
-Function f_quote:Double(tt:Double, _:Double)
+Function f_quote:Double(tt:Double, _:Double) Inline
     Return car(tt)
 End Function
 
-Function f_cons:Double(tt:Double, e:Double)
+Function f_cons:Double(tt:Double, e:Double) Inline
     tt = evlis(tt, e)
     Return cons(car(tt), car(cdr(tt)))
 End Function
 
-Function f_list:Double(tt:Double, e:Double)
+Function f_list:Double(tt:Double, e:Double) Inline
     Return evlis(tt, e)
 End Function
 
-Function f_car:Double(tt:Double, e:Double)
+Function f_car:Double(tt:Double, e:Double) Inline
     Return car(car(evlis(tt, e)))
 End Function
 
-Function f_cdr:Double(tt:Double, e:Double)
+Function f_cdr:Double(tt:Double, e:Double) Inline
     Return cdr(car(evlis(tt, e)))
 End Function
 
@@ -274,49 +276,49 @@ Function f_div:Double(tt:Double, e:Double)
     Return num(n)
 End Function
 
-Function f_int:Double(t:Double, e:Double)
+Function f_int:Double(t:Double, e:Double) Inline
     Local n:Double = car(evlis(t,e))
     If n < 1e16 And n > 1e-16 Then Return Long(n)
     Return n
 End Function
 
-Function f_lt:Double(t:Double, e:Double)
+Function f_lt:Double(t:Double, e:Double) Inline
     t = evlis(t, e)
     If car(t) < car(cdr(t)) Then Return tru_val
     Return nil_val
 End Function
 
-Function f_eq:Double(t:Double, e:Double)
+Function f_eq:Double(t:Double, e:Double) Inline
     t = evlis(t, e)
     If equ(car(t), car(cdr(t))) Then Return tru_val
     Return nil_val
 End Function
 
-Function f_not_eq:Double(t:Double, e:Double)
+Function f_not_eq:Double(t:Double, e:Double) Inline
     t = evlis(t, e)
     If car(t) <> car(cdr(t)) Then Return tru_val
     Return nil_val
 End Function
 
-Function f_lteq:Double(t:Double, e:Double)
+Function f_lteq:Double(t:Double, e:Double) Inline
     t = evlis(t, e)
     If car(t) <= car(cdr(t)) Then Return tru_val
     Return nil_val
 End Function
 
-Function f_gt:Double(t:Double, e:Double)
+Function f_gt:Double(t:Double, e:Double) Inline
     t = evlis(t, e)
     If car(t) > car(cdr(t)) Then Return tru_val
     Return nil_val
 End Function
 
-Function f_gteq:Double(t:Double, e:Double)
+Function f_gteq:Double(t:Double, e:Double) Inline
     t = evlis(t, e)
     If car(t) >= car(cdr(t)) Then Return tru_val
     Return nil_val
 End Function
 
-Function f_not:Double(t:Double, e:Double)
+Function f_not:Double(t:Double, e:Double) Inline
     If lispNot(car(evlis(t, e))) Then Return tru_val
     Return nil_val
 End Function
@@ -341,7 +343,7 @@ Function f_and:Double(tt:Double, e:Double)
     Return x
 End Function
 
-Function f_cond:Double(tt:Double, e:Double)
+Function f_cond:Double(tt:Double, e:Double) Inline
     While T(tt) <> NIL_TAG And lispNot(eval(car(car(tt)), e))
         tt = cdr(tt)
     Wend
@@ -420,7 +422,6 @@ Function f_lambda:Double(tt:Double, e:Double)
 End Function
 
 Function f_progn:Double(tt:Double, e:Double)
-    Print ""
     Local result:Double = nil_val
     While Not lispNot(tt)
         result = eval(car(tt), e)
@@ -451,7 +452,7 @@ Function f_prog2:Double(tt:Double, e:Double)
     Return result
 End Function
 
-Function f_define:Double(tt:Double, e:Double)
+Function f_define:Double(tt:Double, e:Double) Inline
     env_val = pair(car(tt), eval(car(cdr(tt)), e), env_val)
     Return car(tt)
 End Function
@@ -917,10 +918,9 @@ Function parser_main()
         Print ""
 
         ' EVAL
-        ' Local start:Int = MilliSecs()
+        Local start:Int = MilliSecs()
         ret = eval(sexp, env_val)
-        ' Print "MilliSecs: " + (MilliSecs() - start)
-
+        Print "MilliSecs: " + (MilliSecs() - start)
         ' PRINT
         Print ""
         lispPrint(ret)
