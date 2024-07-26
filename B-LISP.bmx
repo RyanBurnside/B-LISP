@@ -360,14 +360,6 @@ Function f_if:Double(tt:Double, e:Double)
     Return f_progn(false_exps, e) 'eval else expressions
 End Function
 
-Function f_leta:Double(tt:Double, e:Double)
-    While let(tt)
-        e = pair(car(car(tt)), eval(car(cdr(car(tt))), e), e)
-        tt = cdr(tt)
-    Wend
-    Return eval(car(tt), e)
-End Function
-
 ' List ex: ((foo (bar 21) (baz 34)) <expr> ... <expr n>)
 Function f_let_star:Double(tt:Double, e:Double)
     Local binding_list:double = car(tt)
