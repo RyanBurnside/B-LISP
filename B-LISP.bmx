@@ -46,6 +46,7 @@ Global env_val:Double
 ' mandates newlines with Print
 Function prin(s:String)
     StandardIOStream.WriteString s
+    StandardIOStream.Flush ()
 End Function
 
 ' Printable versions of our NaN boxing constants
@@ -62,7 +63,7 @@ End Function
 
 ' We want to force the Lisp expression (double) into being read as an unsighed int
 ' this allows us to shift the bits and find the tag it was encoded with
-Function T:ULong(x:Double) Inline
+Function T:ULong(x:Double)
     GCSuspend()
         Local ulong_ptr:ULong Ptr = Varptr x
         Local result:ULong = ulong_ptr[0] Shr 48
@@ -72,7 +73,7 @@ End Function
 
 ''' NaN-boxing specific functions:
 '''    box(t,i): returns a New NaN-boxed Double with tag t And ordinal i
-Function box:Double(tag:ULong, i:ULong) Inline
+Function box:Double(tag:ULong, i:ULong)
     Local temp:Double
     GCSuspend()
         Local u_longptr:ULong Ptr = Varptr temp
@@ -83,7 +84,7 @@ End Function
 
 ''' ord(x): returns the ordinal of the NaN-boxed Double x
 ''' not representative of *actual* value in base 10 
-Function ord:ULong(x:Double) Inline
+Function ord:ULong(x:Double)
     Local temp:ULong
     GCSuspend()
         Local u_longptr:ULong Ptr = Varptr x
@@ -93,12 +94,12 @@ Function ord:ULong(x:Double) Inline
 End Function 
 
 ' Does nothing, but could be extended to check for NaN
-Function num:Double(n:Double) Inline
+Function num:Double(n:Double)
     Return n
 End Function
 
 ' Returns nonzero if x equals y
-Function equ:ULong(x:Double, y:Double) Inline
+Function equ:ULong(x:Double, y:Double)
     Local temp:ULong
     GCSuspend()
         Local u_longptr_x:ULong Ptr = Varptr x
@@ -132,21 +133,16 @@ Function atom:Double(s:String)
 End Function
 
 ' construct pair (x . y) returns a NaN-boxed CONS_TAG
-Function cons:Double(x:Double, y:Double) Inline
+Function cons:Double(x:Double, y:Double)
     sp :- 1
     cell[sp] = x
     sp :- 1
     cell[sp] = y
-    If (hp > sp Shl 3)
-        Print "Unrecoverable error: stack overflow"
-        Local zero:Int = 0
-        Local kill_me:Double = 1 / zero
-    EndIf    
     Return box(CONS_TAG, sp)
 End Function
 
 ' return the car of the pair or ERR if not a pair
-Function car:Double(p:Double) Inline
+Function car:Double(p:Double)
     If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
         Return cell[ord(p) + 1]
     End If
@@ -154,7 +150,7 @@ Function car:Double(p:Double) Inline
 End Function
 
 ' return the cdr of the pair or ERR if not a pair
-Function cdr:Double(p:Double) Inline
+Function cdr:Double(p:Double)
     If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
         Return cell[ord(p)]
     End If
@@ -162,12 +158,12 @@ Function cdr:Double(p:Double) Inline
 End Function
 
 ' construct a pair to add to environment e, returns the list ((v . x) . e)
-Function pair:Double(v:Double, x:Double, e:Double) Inline
+Function pair:Double(v:Double, x:Double, e:Double)
     Return cons(cons(v, x), e)
 End Function
 
 ' construct a closure, returns a NaN-boxed CLOS_TAG
-Function closure:Double(v:Double, x:Double, e:Double) Inline
+Function closure:Double(v:Double, x:Double, e:Double)
     '  return box(CLOS,ord(pair(v,x,equ(e,env) ? nil : e))); }
     Local env:Double
     If equ(e, env_val) Then env = nil_val Else env = e
@@ -175,7 +171,7 @@ Function closure:Double(v:Double, x:Double, e:Double) Inline
 End Function
 
 ' look up a symbol in an environment, return its value or err if not found
-Function assoc:Double(v:Double, e:Double) Inline
+Function assoc:Double(v:Double, e:Double)
     While T(e) = CONS_TAG And (Not equ(v, car(car(e))))
         e = cdr(e)
     Wend
@@ -184,46 +180,50 @@ Function assoc:Double(v:Double, e:Double) Inline
 End Function
 
 ' lispNot(x) is nonzero if x is the lisp () empty list
-Function lispNot:ULong(x:Double) Inline
+Function lispNot:ULong(x:Double)
     Return T(x) = NIL_TAG
 End Function
 
-' return a new list of evaluated Lisp expresions t in the environment e
-Function evlis:Double(tag:Double, e:Double) Inline
-    Select T(tag)
-    Case CONS_TAG 
-        Return cons(eval(car(tag), e), evlis(cdr(tag), e))
-    Case ATOM_TAG 
-        Return assoc(tag, e)
-    Default 
-        Return nil_val
-    End Select
+
+Function evlis:Double(tt:Double, e:Double)
+    Local s:Double = nil_val
+    GCSuspend()
+    Local p:Double Ptr = Varptr s
+    Local array_ptr:Double Ptr = Varptr cell
+    While T(tt) = CONS_TAG
+        p[0] = cons(eval(car(tt), e), nil_val)
+        p = array_ptr + sp
+        tt = cdr(tt)
+    Wend
+    If T(tt) = ATOM_TAG Then p[0] = assoc(tt, e)
+    GCResume()
+    Return s
 End Function
 
 ' these f_ prefixed functions get called in the Function lookup table
-' tt is a parameters list, e is the global environment
-Function f_eval:Double(tt:Double, e:Double) Inline
+' tt is a parameters list, e is the Global environment
+Function f_eval:Double(tt:Double, e:Double)
     Return eval(car(evlis(tt, e)), e)
 End Function
 
-Function f_quote:Double(tt:Double, _:Double) Inline
+Function f_quote:Double(tt:Double, _:Double)
     Return car(tt)
 End Function
 
-Function f_cons:Double(tt:Double, e:Double) Inline
+Function f_cons:Double(tt:Double, e:Double)
     tt = evlis(tt, e)
     Return cons(car(tt), car(cdr(tt)))
 End Function
 
-Function f_list:Double(tt:Double, e:Double) Inline
+Function f_list:Double(tt:Double, e:Double)
     Return evlis(tt, e)
 End Function
 
-Function f_car:Double(tt:Double, e:Double) Inline
+Function f_car:Double(tt:Double, e:Double)
     Return car(car(evlis(tt, e)))
 End Function
 
-Function f_cdr:Double(tt:Double, e:Double) Inline
+Function f_cdr:Double(tt:Double, e:Double)
     Return cdr(car(evlis(tt, e)))
 End Function
 
@@ -276,49 +276,49 @@ Function f_div:Double(tt:Double, e:Double)
     Return num(n)
 End Function
 
-Function f_int:Double(t:Double, e:Double) Inline
+Function f_int:Double(t:Double, e:Double)
     Local n:Double = car(evlis(t,e))
     If n < 1e16 And n > 1e-16 Then Return Long(n)
     Return n
 End Function
 
-Function f_lt:Double(t:Double, e:Double) Inline
+Function f_lt:Double(t:Double, e:Double)
     t = evlis(t, e)
     If car(t) < car(cdr(t)) Then Return tru_val
     Return nil_val
 End Function
 
-Function f_eq:Double(t:Double, e:Double) Inline
+Function f_eq:Double(t:Double, e:Double)
     t = evlis(t, e)
     If equ(car(t), car(cdr(t))) Then Return tru_val
     Return nil_val
 End Function
 
-Function f_not_eq:Double(t:Double, e:Double) Inline
+Function f_not_eq:Double(t:Double, e:Double)
     t = evlis(t, e)
     If car(t) <> car(cdr(t)) Then Return tru_val
     Return nil_val
 End Function
 
-Function f_lteq:Double(t:Double, e:Double) Inline
+Function f_lteq:Double(t:Double, e:Double)
     t = evlis(t, e)
     If car(t) <= car(cdr(t)) Then Return tru_val
     Return nil_val
 End Function
 
-Function f_gt:Double(t:Double, e:Double) Inline
+Function f_gt:Double(t:Double, e:Double)
     t = evlis(t, e)
     If car(t) > car(cdr(t)) Then Return tru_val
     Return nil_val
 End Function
 
-Function f_gteq:Double(t:Double, e:Double) Inline
+Function f_gteq:Double(t:Double, e:Double)
     t = evlis(t, e)
     If car(t) >= car(cdr(t)) Then Return tru_val
     Return nil_val
 End Function
 
-Function f_not:Double(t:Double, e:Double) Inline
+Function f_not:Double(t:Double, e:Double)
     If lispNot(car(evlis(t, e))) Then Return tru_val
     Return nil_val
 End Function
@@ -343,7 +343,7 @@ Function f_and:Double(tt:Double, e:Double)
     Return x
 End Function
 
-Function f_cond:Double(tt:Double, e:Double) Inline
+Function f_cond:Double(tt:Double, e:Double)
     While T(tt) <> NIL_TAG And lispNot(eval(car(car(tt)), e))
         tt = cdr(tt)
     Wend
@@ -364,8 +364,8 @@ End Function
 
 ' List ex: ((foo (bar 21) (baz 34)) <expr> ... <expr n>)
 Function f_let_star:Double(tt:Double, e:Double)
-    Local binding_list:double = car(tt)
-    Local sexps:double = cdr(tt)
+    Local binding_list:Double = car(tt)
+    Local sexps:Double = cdr(tt)
     
     While Not LispNot(binding_list)
         Local current_binding:Double = car(binding_list)
@@ -374,7 +374,7 @@ Function f_let_star:Double(tt:Double, e:Double)
             e = pair(current_binding, nil_val, e)
         Else ' use the car And cadr of the pair
             e = pair(car(current_binding), eval(car(cdr(current_binding)), e), e)
-        End if
+        End If
         
         binding_list = cdr(binding_list)
     Wend
@@ -383,8 +383,8 @@ End Function
 
 ' List ex: ((foo (bar 21) (baz 34)) <expr> ... <expr n>)
 Function f_let:Double(tt:Double, e:Double)
-    Local binding_list:double = car(tt)
-    Local sexps:double = cdr(tt)
+    Local binding_list:Double = car(tt)
+    Local sexps:Double = cdr(tt)
     Local cons_list:Double = nil_val
     While Not LispNot(binding_list)
         Local current_binding:Double = car(binding_list)
@@ -394,13 +394,13 @@ Function f_let:Double(tt:Double, e:Double)
         Else ' use the car And cadr of the pair
             cons_list = cons(cons(car(current_binding),
                              eval(car(cdr(current_binding)), e)), cons_list)
-        End if
+        End If
 
         binding_list = cdr(binding_list)
     Wend
 
     While Not lispNot(cons_list)
-        Local cur_pair:double = car(cons_list)
+        Local cur_pair:Double = car(cons_list)
         e = pair(car(cur_pair), cdr(cur_pair), e)
         cons_list = cdr(cons_list)
     Wend
@@ -452,7 +452,7 @@ Function f_prog2:Double(tt:Double, e:Double)
     Return result
 End Function
 
-Function f_define:Double(tt:Double, e:Double) Inline
+Function f_define:Double(tt:Double, e:Double)
     env_val = pair(car(tt), eval(car(cdr(tt)), e), env_val)
     Return car(tt)
 End Function
@@ -590,7 +590,7 @@ Function debugPrint(x:Double)
     Print "*** Debug Print ***"
     Print "Analyzed double"
     Print "Original double value: " + String.FromDouble(x)
-    Print "Sign bit:" + String.FromULong(val Shr 63)
+    Print "Sign bit:" + String.FromULong(val Shr 63) 
     Print "Exponent: $" + Hex((val Shr 52) & $7FF)[5..]
     Print "Mantissa: $" + LongHex(val & $FFFFFFFFFFFFF:ULong)[3..]
     If x = x Then Print "NaN: no" Else Print "NaN: yes" 
@@ -848,7 +848,7 @@ Function nan_main:Int()
     Print "Starting B-LISP"
     nil_val = box(NIL_TAG, 0)
     err_val = atom("ERR")
-    tru_val = atom("#t")
+    tru_val = atom("t")
     env_val = pair(tru_val, tru_val, nil_val)
     For Local i:ULong = 0 Until prim.Length
         env_val = pair(atom(prim[i].s), box(PRIM_TAG, i), env_val)
@@ -896,7 +896,7 @@ Function parser_main()
     quit_val = box(NIL_TAG, 1)                ' TODO make roots in real GC
     
     err_val = atom("ERR")                     ' TODO make roots in real GC
-    tru_val = atom("#t")                      ' TODO make roots in real GC
+    tru_val = atom("t")                      ' TODO make roots in real GC
     env_val = pair(tru_val, tru_val, nil_val) ' TODO make roots in real GC
 
     For Local i:ULong = 0 Until prim.Length
@@ -907,9 +907,14 @@ Function parser_main()
         ' READ
         Local cellsUsed:ULong = N - sp
         Local cellsRemaining:ULong = sp - Ceil(hp / 8.0)
+        Local statements:String = ""
         Local prompt:String = "B-LISP[" + cellsUsed + "/" + cellsRemaining + "]> "
         
-        Local statements:String = Input(prompt).Trim()
+        Repeat statements:String = Input(prompt)
+        statements.Trim()
+        Until statements <> ""
+
+        Print "statements: " + statements
         Local lexer:Lexer = New Lexer(makeRegexTableBlisp(), statements)
         Local parser:Parser = New Parser(lexer)
         Local sexp:Double = parser.parse()
