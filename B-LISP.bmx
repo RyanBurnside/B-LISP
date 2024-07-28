@@ -42,6 +42,20 @@ Global env_val:Double
 
 ' This module follows much of the TinyLisp (99 lines of C) implementation
 
+Function printBanner()
+    Print ""
+    Print "    ######        #      ###  ######  ###### "
+    Print "   #     #       #       #  #        #     #"
+    Print "  ######  ##### #       #   ######  ###### "
+    Print " #     #       #       #         # #      "
+    Print "######        ###### ###  ######  #      "
+    Print ""
+    Print "Ryan Burnside 2024 ver: Pre-Alpha"
+    Print ""
+End Function
+
+
+
 ' This stupid thing needs to exist because blitzmax
 ' mandates newlines with Print
 Function prin(s:String)
@@ -890,7 +904,7 @@ End Function
 
 Function parser_main()
     Local ret:Double
-    Print "Welcome to B-LISP."
+    printBanner()
 
     nil_val = box(NIL_TAG, 0)                 ' TODO make roots in real GC
     quit_val = box(NIL_TAG, 1)                ' TODO make roots in real GC
@@ -910,15 +924,15 @@ Function parser_main()
         Local statements:String = ""
         Local prompt:String = "B-LISP[" + cellsUsed + "/" + cellsRemaining + "]> "
         
-        Repeat statements:String = Input(prompt)
+        Repeat statements = Input(prompt)
         statements.Trim()
         Until statements <> ""
 
-        Print "statements: " + statements
+        Print "; Statements: " + statements
         Local lexer:Lexer = New Lexer(makeRegexTableBlisp(), statements)
         Local parser:Parser = New Parser(lexer)
         Local sexp:Double = parser.parse()
-        prin "Parsed Lisp Object: "
+        prin "; Parsed Lisp Object: "
         lispPrint(sexp)
         Print ""
 
