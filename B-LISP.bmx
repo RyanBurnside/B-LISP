@@ -474,28 +474,12 @@ Function f_prog2:Double(tt:Double, e:Double)
 End Function
 
 Function f_define:Double(tt:Double, e:Double)
-    Print ""
     If T(car(tt)) = CONS_TAG ' Function syntatic sugar
         Local symArgParms:Double = car(tt)
-        Print "SymArgParms: "
-        lispPrint symArgParms
-        Print ""
         Local sym:Double = car(symArgParms)
-        Print "Sym: "
-        lispPrint sym
-        Print ""
         Local parms:Double = cdr(symArgParms)
-        Print "parms: "
-        lispPrint parms
-        Print ""
         Local exps:Double = cdr(tt)
-        Print "exps: "
-        lispPrint exps
-        Print ""
         Local lambdaList:Double = cons(parms, exps)
-        Print "lambdaList:: "
-        lispPrint lambdaList
-        Print ""
         env_val = pair(sym, eval(f_lambda(lambdaList, e), e), env_val)
         Return sym
     else 
