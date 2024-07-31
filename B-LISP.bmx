@@ -44,17 +44,15 @@ Global env_val:Double
 
 Function printBanner()
     Print ""
-    Print "    ######        #      ###  ######  ###### "
-    Print "   #     #       #       #  #        #     #"
-    Print "  ######  ##### #       #   ######  ###### "
-    Print " #     #       #       #         # #      "
-    Print "######        ###### ###  ######  #      "
+    Print ";     ######        #      ###  ######  ###### "
+    Print ";    #     #       #       #  #        #     #"
+    Print ";   ######  ##### #       #   ######  ###### "
+    Print ";  #     #       #       #         # #      "
+    Print "; ######        ###### ###  ######  #      "
     Print ""
-    Print "Ryan Burnside 2024 ver: Pre-Alpha"
+    Print "; Ryan Burnside 2024 ver: Pre-Alpha"
     Print ""
 End Function
-
-
 
 ' This stupid thing needs to exist because blitzmax
 ' mandates newlines with Print
@@ -178,7 +176,6 @@ End Function
 
 ' construct a closure, returns a NaN-boxed CLOS_TAG
 Function closure:Double(v:Double, x:Double, e:Double)
-    '  return box(CLOS,ord(pair(v,x,equ(e,env) ? nil : e))); }
     Local env:Double
     If equ(e, env_val) Then env = nil_val Else env = e
     Return box(CLOS_TAG, ord(pair(v, x, env)))
@@ -431,8 +428,14 @@ Function f_print:Double(tt:Double, e:Double)
     Return nil_val
 End Function
 
+Function f_terpri:Double(tt:Double, e:Double)
+    Print "" ' just a New line
+    Return nil_val
+End Function
+
 Function f_lambda:Double(tt:Double, e:Double)
-    Return closure(car(tt), car(cdr(tt)), e)
+    ' we depart from TinyLisp once more, adding implicit progn
+    Return closure(car(tt), cons(atom("progn"), cdr(tt)), e)
 End Function
 
 Function f_progn:Double(tt:Double, e:Double)
@@ -446,9 +449,11 @@ End Function
 
 Function f_prog1:Double(tt:Double, e:Double)
     Local result:Double = nil_val
+    Local temp:Double = nil_val
     Local counter:Int = 0
     While Not lispNot(tt)
-        If counter = 0 Then result = eval(car(tt), e)
+        temp = eval(car(tt), e)
+        If counter = 0 Then result = temp
         tt = cdr(tt)
         counter :+ 1
     Wend
@@ -457,9 +462,11 @@ End Function
 
 Function f_prog2:Double(tt:Double, e:Double)
     Local result:Double = nil_val
+    Local temp:Double = nil_val
     Local counter:Int = 0
     While Not lispNot(tt)
-        If counter = 1 Then result = eval(car(tt), e)
+        temp = eval(car(tt), e)
+        If counter = 1 Then result = temp
         tt = cdr(tt)
         counter :+ 1
     Wend
@@ -467,13 +474,52 @@ Function f_prog2:Double(tt:Double, e:Double)
 End Function
 
 Function f_define:Double(tt:Double, e:Double)
-    env_val = pair(car(tt), eval(car(cdr(tt)), e), env_val)
-    Return car(tt)
+    Print ""
+    If T(car(tt)) = CONS_TAG ' Function syntatic sugar
+        Local symArgParms:Double = car(tt)
+        Print "SymArgParms: "
+        lispPrint symArgParms
+        Print ""
+        Local sym:Double = car(symArgParms)
+        Print "Sym: "
+        lispPrint sym
+        Print ""
+        Local parms:Double = cdr(symArgParms)
+        Print "parms: "
+        lispPrint parms
+        Print ""
+        Local exps:Double = cdr(tt)
+        Print "exps: "
+        lispPrint exps
+        Print ""
+        Local lambdaList:Double = cons(parms, exps)
+        Print "lambdaList:: "
+        lispPrint lambdaList
+        Print ""
+        env_val = pair(sym, eval(f_lambda(lambdaList, e), e), env_val)
+        Return sym
+    else 
+        env_val = pair(car(tt), eval(car(cdr(tt)), e), env_val)
+        Return car(tt)
+    EndIf 
+
+End Function
+
+' tt is (name (parms ...) statements ... )
+Function f_defun:Double(tt:Double, e:Double)
+    Print "Not yet implemented"
+    Return nil_val
 End Function
 
 Function f_quit:Double(tt:Double, e:Double)
     Return quit_val
 End Function
+
+
+Function f_dummy:Double(tt:Double, e:Double)
+    Print "Not yet implimented"
+    Return nil_val
+End function
 
 ' table of Lisp primitives, each has a name s And a Function pointer f
 Type fnPointer
@@ -485,40 +531,42 @@ Type fnPointer
     End Method
 End Type
 
+
 ' Given a symbol Return the Function it represents
 Global prim:fnPointer[] = [ ..
-New fnPointer("eval",     f_eval),
-New fnPointer("quote",    f_quote),
-New fnPointer("cons",     f_cons),
-New fnPointer("list",     f_list),
-New fnPointer("car",      f_car),
-New fnPointer("cdr",      f_cdr),
-New fnPointer("+",        f_add),
-New fnPointer("-",        f_sub),
-New fnPointer("*",        f_mul),
-New fnPointer("/",        f_div),
-New fnPointer("int",      f_int),
-New fnPointer("<",        f_lt),    ' TODO variadic
-New fnPointer("<=",       f_lteq),  ' TODO variadic
-New fnPointer(">",        f_gt),    ' TODO variadic
-New fnPointer(">=",       f_gteq),  ' TODO variadic
-New fnPointer("/=",       f_not_eq),' TODO variadic
-New fnPointer("eq?",      f_eq),    ' TODO variadic
-New fnPointer("or",       f_or),
-New fnPointer("and",      f_and),
-New fnPointer("not",      f_not),
-New fnPointer("cond",     f_cond),
-New fnPointer("if",       f_if),
-New fnPointer("let",      f_let),
-New fnPointer("let*",     f_let_star),
-New fnPointer("lambda",   f_lambda),
-New fnPointer("define",   f_define),
-New fnPointer("progn",    f_progn),
-New fnPointer("prog1",    f_prog1),
-New fnPointer("prog2",    f_prog2),
-New fnPointer("print",    f_print),
-New fnPointer("quit",     f_quit)]
-
+New fnPointer("eval",   f_eval),
+New fnPointer("quote",  f_quote),
+New fnPointer("cons",   f_cons),
+New fnPointer("list",   f_list),
+New fnPointer("car",    f_car),
+New fnPointer("cdr",    f_cdr),
+New fnPointer("+",      f_add),
+New fnPointer("-",      f_sub),
+New fnPointer("*",      f_mul),
+New fnPointer("/",      f_div),
+New fnPointer("int",    f_int),
+New fnPointer("<",      f_lt),    ' TODO variadic
+New fnPointer("<=",     f_lteq),  ' TODO variadic
+New fnPointer(">",      f_gt),    ' TODO variadic
+New fnPointer(">=",     f_gteq),  ' TODO variadic
+New fnPointer("/=",     f_not_eq),' TODO variadic
+New fnPointer("eq?",    f_eq),    ' TODO variadic
+New fnPointer("or",     f_or),
+New fnPointer("and",    f_and),
+New fnPointer("not",    f_not),
+New fnPointer("cond",   f_cond),
+New fnPointer("if",     f_if),
+New fnPointer("let",    f_let),
+New fnPointer("let*",   f_let_star),
+New fnPointer("lambda", f_lambda),
+New fnPointer("define", f_define),
+New fnPointer("defun",  f_defun),
+New fnPointer("progn",  f_progn),
+New fnPointer("prog1",  f_prog1),
+New fnPointer("prog2",  f_prog2),
+New fnPointer("print",  f_print),
+New fnPointer("terpri",  f_terpri),
+New fnPointer("quit",   f_quit)]
 ' create environment by extending e with the variables v bount to values t
 
 Function bind:Double(v:Double, tt:Double, e:Double)
