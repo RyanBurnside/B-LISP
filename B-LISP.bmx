@@ -299,6 +299,12 @@ Function f_lt:Double(t:Double, e:Double)
     Return nil_val
 End Function
 
+Function f_zerop:Double(t:Double, e:Double)
+    t = evlis(t, e)
+    If car(t) = 0 Then Return tru_val
+    Return nil_val
+End Function
+
 Function f_eq:Double(t:Double, e:Double)
     t = evlis(t, e)
     If equ(car(t), car(cdr(t))) Then Return tru_val
@@ -358,7 +364,8 @@ Function f_cond:Double(tt:Double, e:Double)
     While T(tt) <> NIL_TAG And lispNot(eval(car(car(tt)), e))
         tt = cdr(tt)
     Wend
-    Return eval(car(cdr(car(tt))), e)
+    If T(tt) = NIL_TAG Then Return nil_val ' ala Common Lisp
+    Return f_progn(cdr(car(tt)), e)
 End Function
 
 ' Deviation from TinyLisp, Emacs' style long else
@@ -485,20 +492,25 @@ Function f_define:Double(tt:Double, e:Double)
     else 
         env_val = pair(car(tt), eval(car(cdr(tt)), e), env_val)
         Return car(tt)
-    EndIf 
+    EndIf
 
 End Function
 
 ' tt is (name (parms ...) statements ... )
 Function f_defun:Double(tt:Double, e:Double)
-    Print "Not yet implemented"
-    Return nil_val
+    Return f_define(cons(cons(car(tt), car(cdr(tt))), cdr(cdr(tt))), e)
 End Function
 
 Function f_quit:Double(tt:Double, e:Double)
     Return quit_val
 End Function
 
+Function f_time:Double(tt:Double, e:Double)
+    Local start:Int = MilliSecs()
+    Local ret:Double = f_eval(tt, e)
+    Print "MilliSecs: " + (MilliSecs() - start)
+    Return ret
+End Function
 
 Function f_dummy:Double(tt:Double, e:Double)
     Print "Not yet implimented"
@@ -535,6 +547,7 @@ New fnPointer(">",      f_gt),    ' TODO variadic
 New fnPointer(">=",     f_gteq),  ' TODO variadic
 New fnPointer("/=",     f_not_eq),' TODO variadic
 New fnPointer("eq?",    f_eq),    ' TODO variadic
+New fnPointer("zerop",  f_zerop), ' maybe variadic
 New fnPointer("or",     f_or),
 New fnPointer("and",    f_and),
 New fnPointer("not",    f_not),
@@ -549,10 +562,11 @@ New fnPointer("progn",  f_progn),
 New fnPointer("prog1",  f_prog1),
 New fnPointer("prog2",  f_prog2),
 New fnPointer("print",  f_print),
-New fnPointer("terpri",  f_terpri),
+New fnPointer("terpri", f_terpri),
+New fnPointer("time",   f_time),
 New fnPointer("quit",   f_quit)]
-' create environment by extending e with the variables v bount to values t
 
+' create environment by extending e with the variables v bount to values t
 Function bind:Double(v:Double, tt:Double, e:Double)
     Select T(v)
     Case NIL_TAG Return e
@@ -969,9 +983,8 @@ Function parser_main()
         Print ""
 
         ' EVAL
-        Local start:Int = MilliSecs()
         ret = eval(sexp, env_val)
-        Print "MilliSecs: " + (MilliSecs() - start)
+
         ' PRINT
         Print ""
         lispPrint(ret)
