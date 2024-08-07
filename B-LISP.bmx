@@ -3,7 +3,7 @@ SuperStrict
 Import brl.retro
 Import text.format
 Import Text.RegEx
-
+Import "GUI-REPL.bmx"
 ' For lexer
 Enum TokenType
     SYMBOL,
@@ -40,6 +40,29 @@ Global tru_val:Double
 Global err_val:Double
 Global env_val:Double
 
+
+' Set all the doubles To 0 in the machine
+Function resetCells()
+    For Local i:Int = 0 Until n
+        cell[i] = 0
+    Next
+End Function
+
+' Reset the state of the machine And initialize environment
+Function resetMachine()
+    resetCells()
+
+    nil_val = box(NIL_TAG, 0)                 ' TODO make roots in real GC
+    quit_val = box(NIL_TAG, 1)                ' TODO make roots in real GC
+    err_val = atom("ERR")                     ' TODO make roots in real GC
+    tru_val = atom("t")                       ' TODO make roots in real GC
+    env_val = pair(tru_val, tru_val, nil_val) ' TODO make roots in real GC
+
+    For Local i:ULong = 0 Until prim.Length
+        env_val = pair(atom(prim[i].s), box(PRIM_TAG, i), env_val)
+    Next
+
+End Function
 ' This module follows much of the TinyLisp (99 lines of C) implementation
 
 Function printBanner()
@@ -75,33 +98,33 @@ End Function
 
 ' We want to force the Lisp expression (double) into being read as an unsighed int
 ' this allows us to shift the bits and find the tag it was encoded with
-Function T:ULong(x:Double)
-    GCSuspend()
+Function T:ULong(x:Double) Inline 
+    'GCSuspend()
         Local ulong_ptr:ULong Ptr = Varptr x
         Local result:ULong = ulong_ptr[0] Shr 48
-    GCResume()
+    'GCResume()
     Return result
 End Function
 
 ''' NaN-boxing specific functions:
 '''    box(t,i): returns a New NaN-boxed Double with tag t And ordinal i
-Function box:Double(tag:ULong, i:ULong)
+Function box:Double(tag:ULong, i:ULong) Inline
     Local temp:Double
-    GCSuspend()
+    'GCSuspend()
         Local u_longptr:ULong Ptr = Varptr temp
         u_longptr[0] = tag Shl 48 | i
-        GCResume()
+    'GCResume()
     Return temp
 End Function
 
 ''' ord(x): returns the ordinal of the NaN-boxed Double x
 ''' not representative of *actual* value in base 10 
-Function ord:ULong(x:Double)
+Function ord:ULong(x:Double) Inline
     Local temp:ULong
-    GCSuspend()
+    'GCSuspend()
         Local u_longptr:ULong Ptr = Varptr x
         temp = u_longptr[0] & $ffffffffffff:ULong
-    GCResume()
+    'GCResume()
     Return temp
 End Function 
 
@@ -113,11 +136,11 @@ End Function
 ' Returns nonzero if x equals y
 Function equ:ULong(x:Double, y:Double)
     Local temp:ULong
-    GCSuspend()
+    'GCSuspend()
         Local u_longptr_x:ULong Ptr = Varptr x
         Local u_longptr_y:ULong Ptr = Varptr y
         temp = (u_longptr_x[0] = u_longptr_y[0])
-    GCResume()
+    'GCResume()
     Return temp
 EndFunction
 
@@ -154,7 +177,7 @@ Function cons:Double(x:Double, y:Double)
 End Function
 
 ' return the car of the pair or ERR if not a pair
-Function car:Double(p:Double)
+Function car:Double(p:Double) Inline
     If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
         Return cell[ord(p) + 1]
     End If
@@ -162,11 +185,16 @@ Function car:Double(p:Double)
 End Function
 
 ' return the cdr of the pair or ERR if not a pair
-Function cdr:Double(p:Double)
+Function cdr:Double(p:Double) Inline
     If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
         Return cell[ord(p)]
     End If
     Return err_val 
+End Function
+
+' Since car(cdr(...)) is used so much, let's just define 'second'
+Function second:Double(p:Double)
+    Return car(cdr(p))
 End Function
 
 ' construct a pair to add to environment e, returns the list ((v . x) . e)
@@ -195,7 +223,6 @@ Function lispNot:ULong(x:Double)
     Return T(x) = NIL_TAG
 End Function
 
-
 Function evlis:Double(tt:Double, e:Double)
     Local s:Double = nil_val
     GCSuspend()
@@ -211,6 +238,19 @@ Function evlis:Double(tt:Double, e:Double)
     Return s
 End Function
 
+' return a new list of evaluated Lisp expresions t in the environment e
+
+' Function evlis:Double(tag:Double, e:Double) Inline
+'     Select T(tag)
+'     Case CONS_TAG 
+'         Return cons(eval(car(tag), e), evlis(cdr(tag), e))
+'     Case ATOM_TAG 
+'         Return assoc(tag, e)
+'     Default 
+'         Return nil_val
+'     End Select
+' End Function
+
 ' these f_ prefixed functions get called in the Function lookup table
 ' tt is a parameters list, e is the Global environment
 Function f_eval:Double(tt:Double, e:Double)
@@ -223,18 +263,18 @@ End Function
 
 Function f_cons:Double(tt:Double, e:Double)
     tt = evlis(tt, e)
-    Return cons(car(tt), car(cdr(tt)))
+    Return cons(car(tt), second(tt))
 End Function
 
 Function f_list:Double(tt:Double, e:Double)
     Return evlis(tt, e)
 End Function
 
-Function f_car:Double(tt:Double, e:Double)
+Function f_car:Double(tt:Double, e:Double) Inline
     Return car(car(evlis(tt, e)))
 End Function
 
-Function f_cdr:Double(tt:Double, e:Double)
+Function f_cdr:Double(tt:Double, e:Double) Inline
     Return cdr(car(evlis(tt, e)))
 End Function
 
@@ -295,7 +335,7 @@ End Function
 
 Function f_lt:Double(t:Double, e:Double)
     t = evlis(t, e)
-    If car(t) < car(cdr(t)) Then Return tru_val
+    If car(t) < second(t) Then Return tru_val
     Return nil_val
 End Function
 
@@ -307,31 +347,31 @@ End Function
 
 Function f_eq:Double(t:Double, e:Double)
     t = evlis(t, e)
-    If equ(car(t), car(cdr(t))) Then Return tru_val
+    If equ(car(t), second(t)) Then Return tru_val
     Return nil_val
 End Function
 
 Function f_not_eq:Double(t:Double, e:Double)
     t = evlis(t, e)
-    If car(t) <> car(cdr(t)) Then Return tru_val
+    If car(t) <> second(t) Then Return tru_val
     Return nil_val
 End Function
 
 Function f_lteq:Double(t:Double, e:Double)
     t = evlis(t, e)
-    If car(t) <= car(cdr(t)) Then Return tru_val
+    If car(t) <= second(t) Then Return tru_val
     Return nil_val
 End Function
 
 Function f_gt:Double(t:Double, e:Double)
     t = evlis(t, e)
-    If car(t) > car(cdr(t)) Then Return tru_val
+    If car(t) > second(t) Then Return tru_val
     Return nil_val
 End Function
 
 Function f_gteq:Double(t:Double, e:Double)
     t = evlis(t, e)
-    If car(t) >= car(cdr(t)) Then Return tru_val
+    If car(t) >= second(t) Then Return tru_val
     Return nil_val
 End Function
 
@@ -391,7 +431,7 @@ Function f_let_star:Double(tt:Double, e:Double)
         If T(current_binding) = ATOM_TAG
             e = pair(current_binding, nil_val, e)
         Else ' use the car And cadr of the pair
-            e = pair(car(current_binding), eval(car(cdr(current_binding)), e), e)
+            e = pair(car(current_binding), eval(second(current_binding), e), e)
         End If
         
         binding_list = cdr(binding_list)
@@ -411,7 +451,7 @@ Function f_let:Double(tt:Double, e:Double)
             cons_list = cons(cons(current_binding, nil_val), cons_list)
         Else ' use the car And cadr of the pair
             cons_list = cons(cons(car(current_binding),
-                             eval(car(cdr(current_binding)), e)), cons_list)
+                             eval(second(current_binding), e)), cons_list)
         End If
 
         binding_list = cdr(binding_list)
@@ -489,8 +529,8 @@ Function f_define:Double(tt:Double, e:Double)
         Local lambdaList:Double = cons(parms, exps)
         env_val = pair(sym, eval(f_lambda(lambdaList, e), e), env_val)
         Return sym
-    else 
-        env_val = pair(car(tt), eval(car(cdr(tt)), e), env_val)
+    Else 
+        env_val = pair(car(tt), eval(second(tt), e), env_val)
         Return car(tt)
     EndIf
 
@@ -498,7 +538,7 @@ End Function
 
 ' tt is (name (parms ...) statements ... )
 Function f_defun:Double(tt:Double, e:Double)
-    Return f_define(cons(cons(car(tt), car(cdr(tt))), cdr(cdr(tt))), e)
+    Return f_define(cons(cons(car(tt), second(tt)), cdr(cdr(tt))), e)
 End Function
 
 Function f_quit:Double(tt:Double, e:Double)
@@ -515,7 +555,7 @@ End Function
 Function f_dummy:Double(tt:Double, e:Double)
     Print "Not yet implimented"
     Return nil_val
-End function
+End Function
 
 ' table of Lisp primitives, each has a name s And a Function pointer f
 Type fnPointer
@@ -950,18 +990,10 @@ End Function
 
 Function parser_main()
     Local ret:Double
+    ' Local GUI:REPLWindow = New REPLWindow()
     printBanner()
-
-    nil_val = box(NIL_TAG, 0)                 ' TODO make roots in real GC
-    quit_val = box(NIL_TAG, 1)                ' TODO make roots in real GC
     
-    err_val = atom("ERR")                     ' TODO make roots in real GC
-    tru_val = atom("t")                      ' TODO make roots in real GC
-    env_val = pair(tru_val, tru_val, nil_val) ' TODO make roots in real GC
-
-    For Local i:ULong = 0 Until prim.Length
-        env_val = pair(atom(prim[i].s), box(PRIM_TAG, i), env_val)
-    Next
+    resetMachine()
 
     Repeat 
         ' READ
@@ -969,8 +1001,9 @@ Function parser_main()
         Local cellsRemaining:ULong = sp - Ceil(hp / 8.0)
         Local statements:String = ""
         Local prompt:String = "B-LISP[" + cellsUsed + "/" + cellsRemaining + "]> "
+
         
-        Repeat statements = Input(prompt)
+        Repeat statements = Input(prompt) 'GUI.prompt(prompt)
         statements.Trim()
         Until statements <> ""
 
