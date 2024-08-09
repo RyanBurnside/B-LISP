@@ -17,6 +17,7 @@ Enum TokenType
     LDOT,
     SKIP, ' Handles whitespace
     ERROR,
+    LAZYCLOSE ' ] closes all trailing parens ending exp
     TEXT_EOF
 End Enum
 
@@ -237,19 +238,6 @@ Function evlis:Double(tt:Double, e:Double)
     GCResume()
     Return s
 End Function
-
-' return a new list of evaluated Lisp expresions t in the environment e
-
-' Function evlis:Double(tag:Double, e:Double) Inline
-'     Select T(tag)
-'     Case CONS_TAG 
-'         Return cons(eval(car(tag), e), evlis(cdr(tag), e))
-'     Case ATOM_TAG 
-'         Return assoc(tag, e)
-'     Default 
-'         Return nil_val
-'     End Select
-' End Function
 
 ' these f_ prefixed functions get called in the Function lookup table
 ' tt is a parameters list, e is the Global environment
@@ -770,6 +758,7 @@ Function stringToTokenType:TokenType(str:String)
     Case "RPAREN" Return TokenType.RPAREN
     Case "LDOT" Return TokenType.LDOT
     Case "SKIP" Return TokenType.SKIP
+    Case "LAZYCLOSE" Return TokenType.LAZYCLOSE
     Case "ERROR" Return TokenType.ERROR
     Default Return TokenType.ERROR
     End Select
@@ -809,6 +798,7 @@ Function makeRegexTableBlisp:String[][] ()
             ["QUOTE",     "'"],
             ["LPAREN",    "[\(]"],
             ["RPAREN",    "[\)]"],
+            ["LAZYCLOSE", "\]"],
             ["LDOT",      "\."],
             ["SKIP",      "[ \t\n]+"],
             ["ERROR",     "[^ \t\n]+"]]
@@ -876,6 +866,7 @@ End Type
 Type Parser
     Field lexer:Lexer
     Field currTok:Token
+    Field nestDepth:Double = 0
     
     Method New(lexer:Lexer)
         Self.lexer = lexer
@@ -899,7 +890,8 @@ Type Parser
     Method parse:Double()
         If match(TokenType.NUMBER) Then Return parseNumber()
         If match(TokenType.SYMBOL) Then Return parseSymbol()
-        If match(TokenType.LPAREN) 
+        If match(TokenType.LPAREN)
+            nestDepth :+ 1
             accept() ' Tossing left paren
             Return parseList()
         End If 
@@ -922,6 +914,12 @@ Type Parser
 
     Method parseList:Double()
         Local expr:Double
+
+        If match(TokenType.LAZYCLOSE)
+            nestDepth :- 1
+            If nestDepth = 0 Then accept()
+            Return nil_val
+        End If
 
         If match(TokenType.RPAREN)
             accept() ' Tosses right paren
