@@ -17,7 +17,7 @@ Enum TokenType
     LDOT,
     SKIP, ' Handles whitespace
     ERROR,
-    LAZYCLOSE ' ] closes all trailing parens ending exp
+    LAZYCLOSE, ' ] closes all trailing parens ending exp
     TEXT_EOF
 End Enum
 
