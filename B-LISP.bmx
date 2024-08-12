@@ -4,6 +4,8 @@ Import brl.retro
 Import text.format
 Import Text.RegEx
 Import "GUI-REPL.bmx"
+
+
 ' For lexer
 Enum TokenType
     SYMBOL,
@@ -34,10 +36,10 @@ Global sp:ULong = N ' stack pointer
 Global cell:Double[N]
 
 ' These will get populated in main()
-' They stand For literal values 
+' They stand For literal values
 Global nil_val:Double
 Global quit_val:Double
-Global tru_val:Double 
+Global tru_val:Double
 Global err_val:Double
 Global env_val:Double
 
@@ -99,7 +101,7 @@ End Function
 
 ' We want to force the Lisp expression (double) into being read as an unsighed int
 ' this allows us to shift the bits and find the tag it was encoded with
-Function T:ULong(x:Double) Inline 
+Function getTag:ULong(x:Double) Inline
     'GCSuspend()
         Local ulong_ptr:ULong Ptr = Varptr x
         Local result:ULong = ulong_ptr[0] Shr 48
@@ -119,7 +121,7 @@ Function box:Double(tag:ULong, i:ULong) Inline
 End Function
 
 ''' ord(x): returns the ordinal of the NaN-boxed Double x
-''' not representative of *actual* value in base 10 
+''' not representative of *actual* value in base 10
 Function ord:ULong(x:Double) Inline
     Local temp:ULong
     'GCSuspend()
@@ -127,7 +129,7 @@ Function ord:ULong(x:Double) Inline
         temp = u_longptr[0] & $ffffffffffff:ULong
     'GCResume()
     Return temp
-End Function 
+End Function
 
 ' Does nothing, but could be extended to check for NaN
 Function num:Double(n:Double)
@@ -155,7 +157,7 @@ Function atom:Double(s:String)
             i :+ embeddedStr.Length + 1
             embeddedStr = String.FromCString(charPtr + i)
         Wend
-    
+
         If i = hp
             Local s_size:Size_T = s.Length + 1
             hp :+ s_size
@@ -179,18 +181,18 @@ End Function
 
 ' return the car of the pair or ERR if not a pair
 Function car:Double(p:Double) Inline
-    If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
+    If getTag(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
         Return cell[ord(p) + 1]
     End If
-    Return err_val 
+    Return err_val
 End Function
 
 ' return the cdr of the pair or ERR if not a pair
 Function cdr:Double(p:Double) Inline
-    If T(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
+    If getTag(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
         Return cell[ord(p)]
     End If
-    Return err_val 
+    Return err_val
 End Function
 
 ' Since car(cdr(...)) is used so much, let's just define 'second'
@@ -212,105 +214,110 @@ End Function
 
 ' look up a symbol in an environment, return its value or err if not found
 Function assoc:Double(v:Double, e:Double)
-    While T(e) = CONS_TAG And (Not equ(v, car(car(e))))
+    While getTag(e) = CONS_TAG And (Not equ(v, car(car(e))))
         e = cdr(e)
     Wend
-    If T(e) = CONS_TAG Then Return cdr(car(e))
+    If getTag(e) = CONS_TAG Then Return cdr(car(e))
     Return err_val
 End Function
 
 ' lispNot(x) is nonzero if x is the lisp () empty list
 Function lispNot:ULong(x:Double)
-    Return T(x) = NIL_TAG
+    Return getTag(x) = NIL_TAG
 End Function
 
-Function evlis:Double(tt:Double, e:Double)
+Function evlis:Double(t:Double, e:Double)
     Local s:Double = nil_val
     GCSuspend()
     Local p:Double Ptr = Varptr s
     Local array_ptr:Double Ptr = Varptr cell
-    While T(tt) = CONS_TAG
-        p[0] = cons(eval(car(tt), e), nil_val)
+    While getTag(t) = CONS_TAG
+        p[0] = cons(eval(car(t), e), nil_val)
         p = array_ptr + sp
-        tt = cdr(tt)
+        t = cdr(t)
     Wend
-    If T(tt) = ATOM_TAG Then p[0] = assoc(tt, e)
+    If getTag(t) = ATOM_TAG Then p[0] = assoc(t, e)
     GCResume()
     Return s
 End Function
 
 ' these f_ prefixed functions get called in the Function lookup table
-' tt is a parameters list, e is the Global environment
-Function f_eval:Double(tt:Double, e:Double)
-    Return eval(car(evlis(tt, e)), e)
+' t is a parameters list, e is the Global environment
+
+Function f_atoms_family:Double(t:Double, e:Double)
+    Return e
 End Function
 
-Function f_quote:Double(tt:Double, _:Double)
-    Return car(tt)
+Function f_eval:Double(t:Double, e:Double)
+    Return eval(car(evlis(t, e)), e)
 End Function
 
-Function f_cons:Double(tt:Double, e:Double)
-    tt = evlis(tt, e)
-    Return cons(car(tt), second(tt))
+Function f_quote:Double(t:Double, _:Double)
+    Return car(t)
 End Function
 
-Function f_list:Double(tt:Double, e:Double)
-    Return evlis(tt, e)
+Function f_cons:Double(t:Double, e:Double)
+    t = evlis(t, e)
+    Return cons(car(t), second(t))
 End Function
 
-Function f_car:Double(tt:Double, e:Double) Inline
-    Return car(car(evlis(tt, e)))
+Function f_list:Double(t:Double, e:Double)
+    Return evlis(t, e)
 End Function
 
-Function f_cdr:Double(tt:Double, e:Double) Inline
-    Return cdr(car(evlis(tt, e)))
+Function f_car:Double(t:Double, e:Double) Inline
+    Return car(car(evlis(t, e)))
 End Function
 
-Function f_add:Double(tt:Double, e:Double)
-    tt = evlis(tt, e)
-    If T(tt) = NIL_TAG Then Return num(0)
+Function f_cdr:Double(t:Double, e:Double) Inline
+    Return cdr(car(evlis(t, e)))
+End Function
+
+Function f_add:Double(t:Double, e:Double)
+    t = evlis(t, e)
+    If getTag(t) = NIL_TAG Then Return num(0)
     Local n:Double = 0
-    While Not lispNot(tt)
-        n :+ car(tt)
-        tt = cdr(tt)
+    While Not lispNot(t)
+        n :+ car(t)
+        t = cdr(t)
     Wend
     Return num(n)
 End Function
 
-Function f_sub:Double(tt:Double, e:Double)
-    tt = evlis(tt, e)
-    If T(tt) = NIL_TAG Then Return err_val
-    Local n:Double = car(tt)
-    If T(cdr(tt)) = NIL_TAG Then Return num(-n)
-    tt = cdr(tt)
-    While Not lispNot(tt)
-        n :- car(tt)
-        tt = cdr(tt)
+Function f_sub:Double(t:Double, e:Double)
+    t = evlis(t, e)
+    If getTag(t) = NIL_TAG Then Return err_val
+    Local n:Double = car(t)
+    If getTag(cdr(t)) = NIL_TAG Then Return num(-n)
+    t = cdr(t)
+    While Not lispNot(t)
+        n :- car(t)
+        t = cdr(t)
     Wend
     Return num(n)
 End Function
 
-Function f_mul:Double(tt:Double, e:Double)
-    tt = evlis(tt, e)
-    If T(tt) = NIL_TAG Then Return num(1)
-    Local n:Double = car(tt)
-    tt = cdr(tt)
-    While Not lispNot(tt)
-        n :* car(tt)
-        tt = cdr(tt)
+Function f_mul:Double(t:Double, e:Double)
+    t = evlis(t, e)
+    If getTag(t) = NIL_TAG Then Return num(1)
+    Local n:Double = car(t)
+    t = cdr(t)
+    While Not lispNot(t)
+        n :* car(t)
+        t = cdr(t)
     Wend
     Return num(n)
 End Function
 
-Function f_div:Double(tt:Double, e:Double)
-    tt = evlis(tt, e)
-    Local n:Double = car(tt)
-    If T(tt) = NIL_TAG Then Return err_val
-    If T(cdr(tt)) = NIL_TAG Then Return num(1.0 / n)
-    tt = cdr(tt)
-    While Not lispNot(tt)
-        n :/ car(tt)
-        tt = cdr(tt)
+Function f_div:Double(t:Double, e:Double)
+    t = evlis(t, e)
+    Local n:Double = car(t)
+    If getTag(t) = NIL_TAG Then Return err_val
+    If getTag(cdr(t)) = NIL_TAG Then Return num(1.0 / n)
+    t = cdr(t)
+    While Not lispNot(t)
+        n :/ car(t)
+        t = cdr(t)
     Wend
     Return num(n)
 End Function
@@ -338,6 +345,15 @@ Function f_eq:Double(t:Double, e:Double)
     If equ(car(t), second(t)) Then Return tru_val
     Return nil_val
 End Function
+
+Function f_eqNum:Double(t:Double, e:Double)
+    t = evlis(t, e)
+    If getTag(car(t)) <> PRIM_TAG Then Return err_val
+    If getTag(second(t)) <> PRIM_TAG Then Return err_val
+    If car(t) = second(t) Then Return tru_val
+    Return nil_val
+End Function
+
 
 Function f_not_eq:Double(t:Double, e:Double)
     t = evlis(t, e)
@@ -368,38 +384,38 @@ Function f_not:Double(t:Double, e:Double)
     Return nil_val
 End Function
 
-Function f_or:Double(tt:Double, e:Double)
+Function f_or:Double(t:Double, e:Double)
     Local x:Double = nil_val
-    While T(tt) <> NIL_TAG
-        x = eval(car(tt), e)
+    While getTag(t) <> NIL_TAG
+        x = eval(car(t), e)
         If Not lispNot(x) Then Return x
-        tt = cdr(tt) 
-    Wend
-    Return x    
-End Function
-
-Function f_and:Double(tt:Double, e:Double)
-    Local x:Double = nil_val
-    While T(tt) <> NIL_TAG
-        x = eval(car(tt), e)
-        If lispNot(x) Then Exit
-        tt = cdr(tt)
+        t = cdr(t)
     Wend
     Return x
 End Function
 
-Function f_cond:Double(tt:Double, e:Double)
-    While T(tt) <> NIL_TAG And lispNot(eval(car(car(tt)), e))
-        tt = cdr(tt)
+Function f_and:Double(t:Double, e:Double)
+    Local x:Double = nil_val
+    While getTag(t) <> NIL_TAG
+        x = eval(car(t), e)
+        If lispNot(x) Then Exit
+        t = cdr(t)
     Wend
-    If T(tt) = NIL_TAG Then Return nil_val ' ala Common Lisp
-    Return f_progn(cdr(car(tt)), e)
+    Return x
+End Function
+
+Function f_cond:Double(t:Double, e:Double)
+    While getTag(t) <> NIL_TAG And lispNot(eval(car(car(t)), e))
+        t = cdr(t)
+    Wend
+    If getTag(t) = NIL_TAG Then Return nil_val ' ala Common Lisp
+    Return f_progn(cdr(car(t)), e)
 End Function
 
 ' Deviation from TinyLisp, Emacs' style long else
-Function f_if:Double(tt:Double, e:Double)
-    Local pred:Double = eval(car(tt), e)
-    Local rest_exps:Double = cdr(tt)
+Function f_if:Double(t:Double, e:Double)
+    Local pred:Double = eval(car(t), e)
+    Local rest_exps:Double = cdr(t)
     Local true_exp:Double = car(rest_exps)
     Local false_exps:Double = cdr(rest_exps)
     If Not lispNot(pred) ' anything but NIL/'()
@@ -409,33 +425,33 @@ Function f_if:Double(tt:Double, e:Double)
 End Function
 
 ' List ex: ((foo (bar 21) (baz 34)) <expr> ... <expr n>)
-Function f_let_star:Double(tt:Double, e:Double)
-    Local binding_list:Double = car(tt)
-    Local sexps:Double = cdr(tt)
-    
+Function f_let_star:Double(t:Double, e:Double)
+    Local binding_list:Double = car(t)
+    Local sexps:Double = cdr(t)
+
     While Not LispNot(binding_list)
         Local current_binding:Double = car(binding_list)
         ' If symbol, bind symbol To nil And add.
-        If T(current_binding) = ATOM_TAG
+        If getTag(current_binding) = ATOM_TAG
             e = pair(current_binding, nil_val, e)
         Else ' use the car And cadr of the pair
             e = pair(car(current_binding), eval(second(current_binding), e), e)
         End If
-        
+
         binding_list = cdr(binding_list)
     Wend
     Return f_progn(sexps, e)
 End Function
 
 ' List ex: ((foo (bar 21) (baz 34)) <expr> ... <expr n>)
-Function f_let:Double(tt:Double, e:Double)
-    Local binding_list:Double = car(tt)
-    Local sexps:Double = cdr(tt)
+Function f_let:Double(t:Double, e:Double)
+    Local binding_list:Double = car(t)
+    Local sexps:Double = cdr(t)
     Local cons_list:Double = nil_val
     While Not LispNot(binding_list)
         Local current_binding:Double = car(binding_list)
         ' If symbol, bind symbol To nil And add.
-        If T(current_binding) = ATOM_TAG
+        If getTag(current_binding) = ATOM_TAG
             cons_list = cons(cons(current_binding, nil_val), cons_list)
         Else ' use the car And cadr of the pair
             cons_list = cons(cons(car(current_binding),
@@ -455,92 +471,92 @@ Function f_let:Double(tt:Double, e:Double)
 End Function
 
 ' Prints all items provided
-Function f_print:Double(tt:Double, e:Double)
-    While Not lispNot(tt)
-        lispPrint(eval(car(tt), e))
-        tt = cdr(tt)
+Function f_print:Double(t:Double, e:Double)
+    While Not lispNot(t)
+        lispPrint(eval(car(t), e))
+        t = cdr(t)
     Wend
     Return nil_val
 End Function
 
-Function f_terpri:Double(tt:Double, e:Double)
+Function f_terpri:Double(t:Double, e:Double)
     Print "" ' just a New line
     Return nil_val
 End Function
 
-Function f_lambda:Double(tt:Double, e:Double)
+Function f_lambda:Double(t:Double, e:Double)
     ' we depart from TinyLisp once more, adding implicit progn
-    Return closure(car(tt), cons(atom("progn"), cdr(tt)), e)
+    Return closure(car(t), cons(atom("progn"), cdr(t)), e)
 End Function
 
-Function f_progn:Double(tt:Double, e:Double)
+Function f_progn:Double(t:Double, e:Double)
     Local result:Double = nil_val
-    While Not lispNot(tt)
-        result = eval(car(tt), e)
-        tt = cdr(tt)
+    While Not lispNot(t)
+        result = eval(car(t), e)
+        t = cdr(t)
     Wend
     Return result
 End Function
 
-Function f_prog1:Double(tt:Double, e:Double)
+Function f_prog1:Double(t:Double, e:Double)
     Local result:Double = nil_val
     Local temp:Double = nil_val
     Local counter:Int = 0
-    While Not lispNot(tt)
-        temp = eval(car(tt), e)
+    While Not lispNot(t)
+        temp = eval(car(t), e)
         If counter = 0 Then result = temp
-        tt = cdr(tt)
+        t = cdr(t)
         counter :+ 1
     Wend
     Return result
 End Function
 
-Function f_prog2:Double(tt:Double, e:Double)
+Function f_prog2:Double(t:Double, e:Double)
     Local result:Double = nil_val
     Local temp:Double = nil_val
     Local counter:Int = 0
-    While Not lispNot(tt)
-        temp = eval(car(tt), e)
+    While Not lispNot(t)
+        temp = eval(car(t), e)
         If counter = 1 Then result = temp
-        tt = cdr(tt)
+        t = cdr(t)
         counter :+ 1
     Wend
     Return result
 End Function
 
-Function f_define:Double(tt:Double, e:Double)
-    If T(car(tt)) = CONS_TAG ' Function syntatic sugar
-        Local symArgParms:Double = car(tt)
+Function f_define:Double(t:Double, e:Double)
+    If getTag(car(t)) = CONS_TAG ' Function syntatic sugar
+        Local symArgParms:Double = car(t)
         Local sym:Double = car(symArgParms)
         Local parms:Double = cdr(symArgParms)
-        Local exps:Double = cdr(tt)
+        Local exps:Double = cdr(t)
         Local lambdaList:Double = cons(parms, exps)
         env_val = pair(sym, eval(f_lambda(lambdaList, e), e), env_val)
         Return sym
-    Else 
-        env_val = pair(car(tt), eval(second(tt), e), env_val)
-        Return car(tt)
+    Else
+        env_val = pair(car(t), eval(second(t), e), env_val)
+        Return car(t)
     EndIf
 
 End Function
 
-' tt is (name (parms ...) statements ... )
-Function f_defun:Double(tt:Double, e:Double)
-    Return f_define(cons(cons(car(tt), second(tt)), cdr(cdr(tt))), e)
+' t is (name (parms ...) statements ... )
+Function f_defun:Double(t:Double, e:Double)
+    Return f_define(cons(cons(car(t), second(t)), cdr(cdr(t))), e)
 End Function
 
-Function f_quit:Double(tt:Double, e:Double)
+Function f_quit:Double(t:Double, e:Double)
     Return quit_val
 End Function
 
-Function f_time:Double(tt:Double, e:Double)
+Function f_time:Double(t:Double, e:Double)
     Local start:Int = MilliSecs()
-    Local ret:Double = f_eval(tt, e)
+    Local ret:Double = f_eval(t, e)
     Print "MilliSecs: " + (MilliSecs() - start)
     Return ret
 End Function
 
-Function f_dummy:Double(tt:Double, e:Double)
+Function f_dummy:Double(t:Double, e:Double)
     Print "Not yet implimented"
     Return nil_val
 End Function
@@ -548,8 +564,8 @@ End Function
 ' table of Lisp primitives, each has a name s And a Function pointer f
 Type fnPointer
     Field s:String
-    Field f:Double(tt:Double, e:Double)
-    Method New (s:String, f:Double(tt:Double, e:Double))
+    Field f:Double(t:Double, e:Double)
+    Method New (s:String, f:Double(t:Double, e:Double))
         Self.s = s
         Self.f = f
     End Method
@@ -558,91 +574,93 @@ End Type
 
 ' Given a symbol Return the Function it represents
 Global prim:fnPointer[] = [ ..
-New fnPointer("eval",   f_eval),
-New fnPointer("quote",  f_quote),
-New fnPointer("cons",   f_cons),
-New fnPointer("list",   f_list),
-New fnPointer("car",    f_car),
-New fnPointer("cdr",    f_cdr),
-New fnPointer("+",      f_add),
-New fnPointer("-",      f_sub),
-New fnPointer("*",      f_mul),
-New fnPointer("/",      f_div),
-New fnPointer("int",    f_int),
-New fnPointer("<",      f_lt),    ' TODO variadic
-New fnPointer("<=",     f_lteq),  ' TODO variadic
-New fnPointer(">",      f_gt),    ' TODO variadic
-New fnPointer(">=",     f_gteq),  ' TODO variadic
-New fnPointer("/=",     f_not_eq),' TODO variadic
-New fnPointer("eq?",    f_eq),    ' TODO variadic
-New fnPointer("zerop",  f_zerop), ' maybe variadic
-New fnPointer("or",     f_or),
-New fnPointer("and",    f_and),
-New fnPointer("not",    f_not),
-New fnPointer("cond",   f_cond),
-New fnPointer("if",     f_if),
-New fnPointer("let",    f_let),
-New fnPointer("let*",   f_let_star),
-New fnPointer("lambda", f_lambda),
-New fnPointer("define", f_define),
-New fnPointer("defun",  f_defun),
-New fnPointer("progn",  f_progn),
-New fnPointer("prog1",  f_prog1),
-New fnPointer("prog2",  f_prog2),
-New fnPointer("print",  f_print),
-New fnPointer("terpri", f_terpri),
-New fnPointer("time",   f_time),
-New fnPointer("quit",   f_quit)]
+New fnPointer("atoms-family", f_atoms_family),
+New fnPointer("eval"        , f_eval),
+New fnPointer("quote"       , f_quote),
+New fnPointer("cons"        , f_cons),
+New fnPointer("list"        , f_list),
+New fnPointer("car"         , f_car),
+New fnPointer("cdr"         , f_cdr),
+New fnPointer("+"           , f_add),
+New fnPointer("-"           , f_sub),
+New fnPointer("*"           , f_mul),
+New fnPointer("/"           , f_div),
+New fnPointer("int"         , f_int),
+New fnPointer("<"           , f_lt),    ' TODO variadic
+New fnPointer("<="          , f_lteq),  ' TODO variadic
+New fnPointer(">"           , f_gt),    ' TODO variadic
+New fnPointer(">="          , f_gteq),  ' TODO variadic
+New fnPointer("/="          , f_not_eq),' TODO variadic
+New fnPointer("eq?"         , f_eq),    ' TODO variadic
+New fnPointer("="           , f_eqNum), ' TODO variadic FIX REGEX TABLE
+New fnPointer("zerop"       , f_zerop), ' maybe variadic
+New fnPointer("or"          , f_or),
+New fnPointer("and"         , f_and),
+New fnPointer("not"         , f_not),
+New fnPointer("cond"        , f_cond),
+New fnPointer("if"          , f_if),
+New fnPointer("let"         , f_let),
+New fnPointer("let*"        , f_let_star),
+New fnPointer("lambda"      , f_lambda),
+New fnPointer("define"      , f_define),
+New fnPointer("defun"       , f_defun),
+New fnPointer("progn"       , f_progn),
+New fnPointer("prog1"       , f_prog1),
+New fnPointer("prog2"       , f_prog2),
+New fnPointer("print"       , f_print),
+New fnPointer("terpri"      , f_terpri),
+New fnPointer("time"        , f_time),
+New fnPointer("quit"        , f_quit)]
 
 ' create environment by extending e with the variables v bount to values t
-Function bind:Double(v:Double, tt:Double, e:Double)
-    Select T(v)
+Function bind:Double(v:Double, t:Double, e:Double)
+    Select getTag(v)
     Case NIL_TAG Return e
-    Case CONS_TAG Return bind(cdr(v), cdr(tt), pair(car(v), car(tt), e))
-    Default Return pair(v, tt, e)
+    Case CONS_TAG Return bind(cdr(v), cdr(t), pair(car(v), car(t), e))
+    Default Return pair(v, t, e)
     End Select
 End Function
 
-Function reduce:Double(f:Double, tt:Double, e:Double)
+Function reduce:Double(f:Double, t:Double, e:Double)
     Local en:Double = cdr(f)
     If lispNot(cdr(f)) Then en = env_val
-    Return eval(cdr(car(f)), bind(car(car(f)), evlis(tt, e), en))
-End Function 
+    Return eval(cdr(car(f)), bind(car(car(f)), evlis(t, e), en))
+End Function
 
-Function Apply:Double(f:Double, tt:Double, e:Double)
-    Select T(f)
-    Case PRIM_TAG Return prim[ord(f)].f(tt, e)
-    Case CLOS_TAG Return reduce(f, tt, e)
+Function Apply:Double(f:Double, t:Double, e:Double)
+    Select getTag(f)
+    Case PRIM_TAG Return prim[ord(f)].f(t, e)
+    Case CLOS_TAG Return reduce(f, t, e)
     Default Return err_val
     End Select
 End Function
 
 Function eval:Double(x:Double, e:Double)
-    Select T(x)
+    Select getTag(x)
     Case ATOM_TAG Return assoc(x, e)
     Case CONS_TAG Return Apply(eval(car(x), e), cdr(x), e)
     Default Return x
     End Select
 End Function
 
-Function printlist(tt:Double)
+Function printlist(t:Double)
     prin "("
     Repeat
-        lispPrint car(tt)
-        tt = cdr(tt)
-        If T(tt) = NIL_TAG Then Exit
-        If T(tt) <> CONS_TAG
+        lispPrint car(t)
+        t = cdr(t)
+        If getTag(t) = NIL_TAG Then Exit
+        If getTag(t) <> CONS_TAG
             prin " . "
-            lispPrint(tt)
+            lispPrint(t)
             Exit
         End If
         prin " "
-    Forever    
+    Forever
     prin ")"
 End Function
 
 Function lispPrint(x:Double)
-    Select T(x)
+    Select getTag(x)
     Case NIL_TAG prin "()"
     Case ATOM_TAG
         GCSuspend()
@@ -667,31 +685,31 @@ End Function
 Function debugPrint(x:Double)
     Local val:ULong
     Local mask:ULong = $ff
-    
+
     GCSuspend()
         Local u_longptr:ULong Ptr = Varptr x
         val = u_longptr[0]
     GCResume()
-    
+
     mask :Shl 56
-    
+
     Print "*** Debug Print ***"
     Print "Analyzed double"
     Print "Original double value: " + String.FromDouble(x)
-    Print "Sign bit:" + String.FromULong(val Shr 63) 
+    Print "Sign bit:" + String.FromULong(val Shr 63)
     Print "Exponent: $" + Hex((val Shr 52) & $7FF)[5..]
     Print "Mantissa: $" + LongHex(val & $FFFFFFFFFFFFF:ULong)[3..]
-    If x = x Then Print "NaN: no" Else Print "NaN: yes" 
-    
+    If x = x Then Print "NaN: no" Else Print "NaN: yes"
+
     Print "Raw Bytes From MSB to LSB"
     Local numBytes:Int = SizeOf(val)
     Local strBuff:String[] = New String[numBytes]
     For Local i:Int = 0 Until numBytes
         strBuff[i] = Hex((val & mask) Shr ((numBytes - 1 - i) * 8))[6..]
         mask :Shr 8;
-    Next 
+    Next
     Print "$"+" ".Join(strBuff)
-    
+
     Print "Individual Bits"
     mask = ULong(1) Shl 63
     Local bitBuffer:String = ""
@@ -701,26 +719,26 @@ Function debugPrint(x:Double)
             bitBuffer :+ " "
             labelBuffer :+ " "
         End If
-        
+
         If (val & mask) bitBuffer :+ "1" Else bitBuffer :+ "0"
         mask :Shr 1
-        
+
         ' label buffer updates
-        If i = 0 
+        If i = 0
             labelBuffer :+ "s"
         Else If i > 0 And i < 12
             labelBuffer :+ "e"
         Else
             labelBuffer :+ "m"
         End If
-        
+
     Next
     Print labelBuffer
     Print bitBuffer
-    
+
     Print "TinyLisp Representation"
     Local tagVal:ULong = val Shr 48
-    
+
     Print "Tag Bits: $" + Hex(tagVal)[4..] + " (" + tagToString(tagVal) + ")"
     Print "Storage Bits: $" + LongHex(val & $FFFFFFFFFFFF:ULong)
     Print "*** end debug ***~n"
@@ -732,9 +750,9 @@ Function dump()
     Local buffer:String = ""
     For Local i:Int = 0 Until cell.Length * 8
         If i Mod 40 = 0 Then buffer :+ "~n"
-        If p[0] <> 0 
+        If p[0] <> 0
             buffer :+ Chr(p[0]) + " "
-        Else 
+        Else
             buffer :+ ". "
         End If
         p :+ 1
@@ -769,12 +787,12 @@ Type Token
     Field value:String
     ' add line and column errors later (if one gives a shit)
     Global formatter:TFormatter = TFormatter.Create("<Token %s(%d), '%s' >")
-    
+
     Method New(typ:TokenType, value:String)
         Self.typ = typ
         Self.value = value
     End Method
-    
+
     Method ToString:String()
         formatter.Clear()
         formatter.Arg(typ.ToString()).Arg(Int(typ)).Arg(value)
@@ -813,7 +831,7 @@ Function RegexTableToRegex:TRegEx(regexTable:String[][])
         regPair.Arg(ID).Arg(Regex)
         Return regPair.format()
     End Function
-    
+
     Local temp:String[regexTable.Length]
     Local counter:Int = 0
 
@@ -821,7 +839,7 @@ Function RegexTableToRegex:TRegEx(regexTable:String[][])
         temp[counter] = JoinTokenSpecs(i[0], i[1])
         counter :+ 1
     Next
-    
+
     ' Multi-Part joined Regex String for token
     Return TRegEx.Create("|".join(temp))
 End Function
@@ -830,21 +848,21 @@ End Function
 Type Lexer
     ' Regex Class
     Field getToken:TRegEx
-    
+
     ' Regex match class
     Field matcher:TRegExMatch
     Field regexTable:String[][]
-    
+
     Method New(regexTable:String[][], text:String)
-        Self.regexTable = regexTable 
+        Self.regexTable = regexTable
         getToken = RegexTableToRegex(regexTable)
         matcher = getToken.Find(text)
     End Method
-    
+
     Method NextToken:Token()
         Local captureType:TokenType
         Local matched:String
-                        
+
         While matcher
             For Local n:String[] = EachIn regexTable
                 Local captureName:String = n[0]
@@ -854,7 +872,7 @@ Type Lexer
                     matcher = getToken.Find()
                     ' Acts like yield, getToken has next match ready to go
                     Return New Token(captureType, matched)
-                End If 
+                End If
             Next
             matcher = getToken.Find()
         Wend
@@ -867,16 +885,16 @@ Type Parser
     Field lexer:Lexer
     Field currTok:Token
     Field nestDepth:Double = 0
-    
+
     Method New(lexer:Lexer)
         Self.lexer = lexer
         currTok = lexer.NextToken()
     End Method
 
-    Method match:Byte(tt:TokenType)
-        Return tt = currTok.typ
+    Method match:Byte(t:TokenType)
+        Return t = currTok.typ
     End Method
-    
+
     Method error()
         RuntimeError "Unexpected current token: " + currTok.ToString()
     End Method
@@ -886,7 +904,7 @@ Type Parser
         currTok = lexer.NextToken()
         Return tempTok
     End Method
-        
+
     Method parse:Double()
         If match(TokenType.NUMBER) Then Return parseNumber()
         If match(TokenType.SYMBOL) Then Return parseSymbol()
@@ -894,19 +912,19 @@ Type Parser
             nestDepth :+ 1
             accept() ' Tossing left paren
             Return parseList()
-        End If 
+        End If
         If match(TokenType.QUOTE)
             accept() ' Toss quote
-            Return parseQuote()    
+            Return parseQuote()
         End If
         error()
     End Method
-        
+
     Method parseNumber:Double()
         Local numTok:Token = accept()
         Return num(Double(numTok.value))
     End Method
-    
+
     Method parseSymbol:Double()
         Local symTok:Token = accept()
         Return atom(symTok.value)
@@ -925,14 +943,14 @@ Type Parser
             accept() ' Tosses right paren
             Return nil_val
         End If
-        
+
         If match(TokenType.LDOT)
             accept() ' Tosses the LDOT
             expr:Double = parse()
             If match(TokenType.RPAREN) Then accept Else error
             Return expr
         End If
-        
+
         expr:Double = parse()
         Return cons(expr, parseList())
     End Method
@@ -951,9 +969,9 @@ Function nan_main:Int()
     For Local i:ULong = 0 Until prim.Length
         env_val = pair(atom(prim[i].s), box(PRIM_TAG, i), env_val)
     Next
-    
+
     Local val_a:Double = num(64)
-    Local val_b:Double = num(36)    
+    Local val_b:Double = num(36)
     For Local op:String = EachIn ["*", "/", "+", "-"]
         Local expr:Double = cons(atom(op), cons(val_a, cons(val_b, nil_val)))
         Print "Doing the function: " + op + " with values: a: " + val_a + " b: " + val_b
@@ -977,9 +995,9 @@ Function lexer_main()
         '(3 . 4)
 """
     Local lexer:Lexer = New Lexer(makeRegexTableBlisp(), statements)
-    
-    Local nextToken:Token = lexer.NextToken() 
-    While nextToken.typ <> TokenType.TEXT_EOF 
+
+    Local nextToken:Token = lexer.NextToken()
+    While nextToken.typ <> TokenType.TEXT_EOF
         nextToken.Print()
         nextToken = lexer.NextToken()
     Wend
@@ -990,17 +1008,17 @@ Function parser_main()
     Local ret:Double
     ' Local GUI:REPLWindow = New REPLWindow()
     printBanner()
-    
+
     resetMachine()
 
-    Repeat 
+    Repeat
         ' READ
         Local cellsUsed:ULong = N - sp
         Local cellsRemaining:ULong = sp - Ceil(hp / 8.0)
         Local statements:String = ""
         Local prompt:String = "B-LISP[" + cellsUsed + "/" + cellsRemaining + "]> "
 
-        
+
         Repeat statements = Input(prompt) 'GUI.prompt(prompt)
         statements.Trim()
         Until statements <> ""
