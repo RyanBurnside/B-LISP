@@ -3,7 +3,7 @@ SuperStrict
 Import brl.retro
 Import text.format
 Import Text.RegEx
-Import "B-LISP.bmx"
+Import "b-lisp.bmx"
 
 ' this needs To be taken out later as Parser.bmx
 

@@ -4,5 +4,8 @@ BMK = bmk
 
 all: b-repl
 
-b-repl: B-LISP.bmx parse.bmx b-repl.bmx
+clean:
+	rm -rf .bmx
+
+b-repl: b-lisp.bmx parse.bmx b-repl.bmx
 	$(BMK) makeapp -w b-repl.bmx

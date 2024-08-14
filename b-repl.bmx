@@ -1,7 +1,7 @@
 SuperStrict
 
 Import "parse.bmx"
-Import "GUI-REPL.bmx"
+'Import "gui-repl.bmx"
 
 Function printBanner()
     Print ""
