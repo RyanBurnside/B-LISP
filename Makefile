@@ -2,7 +2,7 @@
 
 BMK = bmk
 
-all: B-LISP
+all: b-repl
 
-B-LISP: B-LISP.bmx
-	$(BMK) makeapp -w B-LISP.bmx
+b-repl: B-LISP.bmx parse.bmx b-repl.bmx
+	$(BMK) makeapp -w b-repl.bmx
