@@ -533,7 +533,8 @@ Function f_time:Double(t:Double, e:Double)
 End Function
 
 Function f_Graphics:double(t:Double, e:Double)
-    Graphics Int(car(t)), Int(second(t))
+    Local parsed:Double = evlis(t, e) ' meh optimize in future
+    Graphics Int(car(parsed)), Int(second(parsed))
     Return nil_val
 End Function
 
@@ -548,12 +549,20 @@ Function f_Flip:Double(t:Double, e:Double)
 End Function
 
 Function f_set_color:Double(t:Double, e:Double)
-    SetColor Int(car(t)), Int(second(t)), Int(third(t))
+    Local parsed:Double = evlis(t, e) ' meh optimize in future
+    SetColor Int(car(parsed)), Int(second(parsed)), Int(third(parsed))
     Return nil_val
 End Function
 
+Function f_draw_line:Double(t:Double, e:Double)
+    Local parsed:Double = evlis(t, e) ' meh optimize in future
+    DrawLine car(parsed), second(parsed), third(parsed), fourth(parsed)
+    Return nil_val
+End function
+
 Function f_draw_rect:Double(t:Double, e:Double)
-    DrawRect Int(car(t)), Int(second(t)), Int(third(t)), Int(fourth(t))
+    Local parsed:Double = evlis(t, e) ' meh optimize in future
+    DrawRect car(parsed), second(parsed), third(parsed), fourth(parsed)
     Return nil_val
 End function
 
@@ -617,6 +626,7 @@ New fnPointer("graphics"    , f_graphics),
 New fnPointer("cls"         , f_cls),
 New fnPointer("flip"        , f_flip),
 New fnPointer("set-color"   , f_set_color),
+New fnPointer("draw-line"   , f_draw_line),
 New fnPointer("draw-rect"   , f_draw_rect)]
 
 ' create environment by extending e with the variables v bount to values t
