@@ -168,6 +168,14 @@ Function second:Double(p:Double)
     Return car(cdr(p))
 End Function
 
+Function third:Double(p:Double)
+    Return car(cdr(cdr(p)))
+End Function
+
+Function fourth:Double(p:Double)
+    Return car(cdr(cdr(cdr(p))))
+End Function 
+
 ' construct a pair to add to environment e, returns the list ((v . x) . e)
 Function pair:Double(v:Double, x:Double, e:Double)
     Return cons(cons(v, x), e)
@@ -524,6 +532,31 @@ Function f_time:Double(t:Double, e:Double)
     Return ret
 End Function
 
+Function f_Graphics:double(t:Double, e:Double)
+    Graphics Int(car(t)), Int(second(t))
+    Return nil_val
+End Function
+
+Function f_Cls:Double(t:Double, e:Double)
+    Cls
+    Return nil_val
+End Function
+
+Function f_Flip:Double(t:Double, e:Double)
+    Flip
+    Return nil_val
+End Function
+
+Function f_set_color:Double(t:Double, e:Double)
+    SetColor Int(car(t)), Int(second(t)), Int(third(t))
+    Return nil_val
+End Function
+
+Function f_draw_rect:Double(t:Double, e:Double)
+    DrawRect Int(car(t)), Int(second(t)), Int(third(t)), Int(fourth(t))
+    Return nil_val
+End function
+
 Function f_dummy:Double(t:Double, e:Double)
     Print "Not yet implimented"
     Return nil_val
@@ -578,7 +611,13 @@ New fnPointer("prog2"       , f_prog2),
 New fnPointer("print"       , f_print),
 New fnPointer("terpri"      , f_terpri),
 New fnPointer("time"        , f_time),
-New fnPointer("quit"        , f_quit)]
+New fnPointer("quit"        , f_quit),
+' stupid Graphics fun
+New fnPointer("graphics"    , f_graphics),
+New fnPointer("cls"         , f_cls),
+New fnPointer("flip"        , f_flip),
+New fnPointer("set-color"   , f_set_color),
+New fnPointer("draw-rect"   , f_draw_rect)]
 
 ' create environment by extending e with the variables v bount to values t
 Function bind:Double(v:Double, t:Double, e:Double)
