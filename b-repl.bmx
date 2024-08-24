@@ -11,7 +11,7 @@ Function printBanner()
     Print ";  #     #       #       #         # #      "
     Print "; ######        ###### ###  ######  #      "
     Print ""
-    Print "; Ryan Burnside 2024 ver: Pre-Alpha"
+    Print "; Ryan Burnside 1976 ver: Pre-Alpha"
     Print ""
 End Function
 

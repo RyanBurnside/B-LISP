@@ -149,6 +149,8 @@ End Function
 
 ' return the car of the pair or ERR if not a pair
 Function car:Double(p:Double) Inline
+    If lispNot(p) Return nil_val ' modified
+
     If getTag(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
         Return cell[ord(p) + 1]
     End If
@@ -157,6 +159,8 @@ End Function
 
 ' return the cdr of the pair or ERR if not a pair
 Function cdr:Double(p:Double) Inline
+    If lispNot(p) Return nil_val ' modified
+    
     If getTag(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
         Return cell[ord(p)]
     End If
@@ -217,8 +221,14 @@ Function evlis:Double(t:Double, e:Double)
     Return s
 End Function
 
+
 ' these f_ prefixed functions get called in the Function lookup table
 ' t is a parameters list, e is the Global environment
+
+Function f_assoc:Double(t:Double, e:Double)
+    Local tt:Double = evlis(t, e)
+    Return assoc(car(tt), second(tt))
+End Function
 
 Function f_atoms_family:Double(t:Double, e:Double)
     Return e
@@ -380,7 +390,7 @@ Function f_and:Double(t:Double, e:Double)
     Return x
 End Function
 
-Function f_cond:Double(t:Double, e:Double)
+Function f_cond:Double(t:Double, e:Double) ' TODO handle no matches
     While getTag(t) <> NIL_TAG And lispNot(eval(car(car(t)), e))
         t = cdr(t)
     Wend
@@ -584,6 +594,7 @@ End Type
 
 ' Given a symbol Return the Function it represents
 Global prim:fnPointer[] = [ ..
+New fnPointer("assoc", f_assoc),
 New fnPointer("atoms-family", f_atoms_family),
 New fnPointer("eval"        , f_eval),
 New fnPointer("quote"       , f_quote),
