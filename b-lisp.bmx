@@ -815,5 +815,3 @@ Function nan_main:Int()
     prin ">>>" + eval(sexp, env_val)
     Return 0
 End Function
-
-
