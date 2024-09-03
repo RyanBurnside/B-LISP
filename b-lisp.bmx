@@ -167,6 +167,23 @@ Function cdr:Double(p:Double) Inline
     Return err_val
 End Function
 
+' NOTE currently it is only safe To use atoms - Not collections
+Function f_setq:Double(t:Double, e:Double)
+    Local v:Double = car(t)
+    Local x:Double = eval(second(t), e)
+
+    While getTag(t) = CONS_TAG And Not equ(v, car(car(e)))
+        e = cdr(e)
+    wend
+
+    If getTag(e) = CONS_TAG
+        cell[ord(car(e))] = x
+        Return x
+    End if
+
+    Return err_val
+End Function
+
 ' Since car(cdr(...)) is used so much, let's just define 'second'
 Function second:Double(p:Double)
     Return car(cdr(p))
@@ -602,6 +619,7 @@ New fnPointer("cons"        , f_cons),
 New fnPointer("list"        , f_list),
 New fnPointer("car"         , f_car),
 New fnPointer("cdr"         , f_cdr),
+New fnPointer("setq"        , f_setq),
 New fnPointer("+"           , f_add),
 New fnPointer("-"           , f_sub),
 New fnPointer("*"           , f_mul),
