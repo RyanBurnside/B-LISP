@@ -168,6 +168,7 @@ Function cdr:Double(p:Double) Inline
 End Function
 
 ' NOTE currently it is only safe To use atoms - Not collections
+' You CAN'T modify the value If bound To a list TODO - FIX
 Function f_setq:Double(t:Double, e:Double)
     Local v:Double = car(t)
     Local x:Double = eval(second(t), e)
@@ -723,10 +724,22 @@ Function lispPrint(x:Double)
 End Function
 
 ' Yeah, this isn't going to stick around Forever. :D
+' Function gc()
+'     sp = ord(env_val)
+' End Function
+
 Function gc()
     sp = ord(env_val)
-End Function
 
+    For Local i:Double = EachIn cell
+        If getTag(i) = ATOM_TAG And ord(i) > hp Then hp = ord(i)
+    Next
+
+    GCSuspend()
+        Local A:Byte Ptr = cell
+        hp :+ String.fromCString(A + hp).length + 1
+    GCResume()
+End Function
 
 Function debugPrint(x:Double)
     Local val:ULong
