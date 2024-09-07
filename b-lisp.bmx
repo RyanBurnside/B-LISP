@@ -185,6 +185,34 @@ Function f_setq:Double(t:Double, e:Double)
     Return err_val
 End Function
 
+' Replace the CAR of a list
+Function f_rplaca:Double(t:Double, e:Double)
+    Local tt:Double = evlis(t, e)
+    Local p:Double = car(tt)
+    Local ret:Double = err_val
+
+    If getTag(p) = CONS_TAG
+        ret = second(tt)
+        cell[ord(p) + 1] = ret
+    End If
+
+    Return ret
+End Function
+
+' Replace the CDR of a list
+Function f_rplacd:Double(t:Double, e:Double)
+    Local tt:Double = evlis(t, e)
+    Local p:Double = car(tt)
+    Local ret:Double = err_val
+
+    If getTag(p) = CONS_TAG
+        ret = second(tt)
+        cell[ord(p)] = ret
+    End If
+
+    Return ret
+End Function
+
 ' Since car(cdr(...)) is used so much, let's just define 'second'
 Function second:Double(p:Double)
     Return car(cdr(p))
@@ -239,9 +267,10 @@ Function evlis:Double(t:Double, e:Double)
     Return s
 End Function
 
-
+' --------------------------------------------------------------------
 ' these f_ prefixed functions get called in the Function lookup table
 ' t is a parameters list, e is the Global environment
+' --------------------------------------------------------------------
 
 Function f_assoc:Double(t:Double, e:Double)
     Local tt:Double = evlis(t, e)
@@ -357,7 +386,6 @@ Function f_eqNum:Double(t:Double, e:Double)
     If car(t) = second(t) Then Return tru_val
     Return nil_val
 End Function
-
 
 Function f_not_eq:Double(t:Double, e:Double)
     t = evlis(t, e)
@@ -562,6 +590,7 @@ End Function
 
 Function f_Graphics:double(t:Double, e:Double)
     Local parsed:Double = evlis(t, e) ' meh optimize in future
+    AppTitle = "B-LISP Visual Environment"
     Graphics Int(car(parsed)), Int(second(parsed))
     Return nil_val
 End Function
@@ -610,6 +639,10 @@ Type fnPointer
 End Type
 
 
+' --------------------------------------------------------------------
+' This is a table of primitive functions called by symbol lookup
+' --------------------------------------------------------------------
+
 ' Given a symbol Return the Function it represents
 Global prim:fnPointer[] = [ ..
 New fnPointer("assoc", f_assoc),
@@ -620,7 +653,11 @@ New fnPointer("cons"        , f_cons),
 New fnPointer("list"        , f_list),
 New fnPointer("car"         , f_car),
 New fnPointer("cdr"         , f_cdr),
+' Mutating functions
 New fnPointer("setq"        , f_setq),
+New fnPointer("rplaca"       , f_rplaca),
+New fnPointer("rplacd"       , f_rplacd),
+' ----
 New fnPointer("+"           , f_add),
 New fnPointer("-"           , f_sub),
 New fnPointer("*"           , f_mul),
@@ -714,9 +751,9 @@ Function lispPrint(x:Double)
             Local A:Byte Ptr = cell
             prin "".FromCString(A+ord(x))
         GCResume()
-    Case PRIM_TAG prin "<" + prim[ord(x)].s + ">"
+    Case PRIM_TAG prin "PRIM-FN<" + prim[ord(x)].s + ">"
     Case CONS_TAG printlist(x)
-    Case CLOS_TAG prin "{" + ULong(ord(x)) + "}"
+    Case CLOS_TAG prin "CLOSURE<" + ULong(ord(x)) + ">"
     Default
         Local F:TFormatter = New TFormatter.Create("%.10f") ' test
         prin F.arg(x).format()
