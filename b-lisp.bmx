@@ -5,11 +5,11 @@ Import text.format
 Import Text.RegEx
 
 ' NaN box constant "tags" For encoding into doubles
-Const ATOM_TAG:ULong = $7ff8  'atom
-Const PRIM_TAG:ULong = $7ff9  'primitive
-Const CONS_TAG:ULong = $7ffa  'cons cell
-Const CLOS_TAG:ULong = $7ffb  'closure
-Const NIL_TAG:ULong  = $7ffc  'duh
+Const ATOM_TAG:ULong = $7ff8  'atom      1111111111111 000
+Const PRIM_TAG:ULong = $7ff9  'primitive 1111111111111 001
+Const CONS_TAG:ULong = $7ffa  'cons cell 1111111111111 010
+Const CLOS_TAG:ULong = $7ffb  'closure   1111111111111 011
+Const NIL_TAG:ULong  = $7ffc  'duh       1111111111111 100
 
 Global N:UInt =  1024 * 1024 * 5 ' number of Lisp objects (doubles) to store
 Global hp:ULong = 0 ' heap pointer
