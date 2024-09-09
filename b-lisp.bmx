@@ -1,5 +1,10 @@
 SuperStrict
 
+' This module follows much of the TinyLisp (99 lines of C) implementation
+' https://github.com/Robert-van-Engelen/tinylisp
+' Also it takes some inspriation from the 1000 line extension
+' https://github.com/Robert-van-Engelen/lisp
+
 Import brl.retro
 Import text.format
 Import Text.RegEx
@@ -46,7 +51,7 @@ Function resetMachine()
     Next
 
 End Function
-' This module follows much of the TinyLisp (99 lines of C) implementation
+
 
 ' This stupid thing needs to exist because blitzmax
 ' mandates newlines with Print
