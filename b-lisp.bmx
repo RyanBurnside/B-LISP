@@ -63,12 +63,12 @@ End Function
 ' Printable versions of our NaN boxing constants
 Function tagToString:String(tag:ULong)
     Select tag
-    Case ATOM_TAG Return "ATOM"
-    Case PRIM_TAG Return "PRIMITIVE"
-    Case CONS_TAG Return "CONS"
-    Case CLOS_TAG Return "CLOSURE"
-    Case NIL_TAG Return "NIL"
-    Default Return "UNKNOWN TYPE"
+        Case ATOM_TAG Return "ATOM"
+        Case PRIM_TAG Return "PRIMITIVE"
+        Case CONS_TAG Return "CONS"
+        Case CLOS_TAG Return "CLOSURE"
+        Case NIL_TAG Return "NIL"
+        Default Return "UNKNOWN TYPE"
     End Select
 End Function
 
@@ -76,8 +76,8 @@ End Function
 ' this allows us to shift the bits and find the tag it was encoded with
 Function getTag:ULong(x:Double) Inline
     'GCSuspend()
-        Local ulong_ptr:ULong Ptr = Varptr x
-        Local result:ULong = ulong_ptr[0] Shr 48
+    Local ulong_ptr:ULong Ptr = Varptr x
+    Local result:ULong = ulong_ptr[0] Shr 48
     'GCResume()
     Return result
 End Function
@@ -87,8 +87,8 @@ End Function
 Function box:Double(tag:ULong, i:ULong) Inline
     Local temp:Double
     'GCSuspend()
-        Local u_longptr:ULong Ptr = Varptr temp
-        u_longptr[0] = tag Shl 48 | i
+    Local u_longptr:ULong Ptr = Varptr temp
+    u_longptr[0] = tag Shl 48 | i
     'GCResume()
     Return temp
 End Function
@@ -98,8 +98,8 @@ End Function
 Function ord:ULong(x:Double) Inline
     Local temp:ULong
     'GCSuspend()
-        Local u_longptr:ULong Ptr = Varptr x
-        temp = u_longptr[0] & $ffffffffffff:ULong
+    Local u_longptr:ULong Ptr = Varptr x
+    temp = u_longptr[0] & $ffffffffffff:ULong
     'GCResume()
     Return temp
 End Function
@@ -113,9 +113,9 @@ End Function
 Function equ:ULong(x:Double, y:Double)
     Local temp:ULong
     'GCSuspend()
-        Local u_longptr_x:ULong Ptr = Varptr x
-        Local u_longptr_y:ULong Ptr = Varptr y
-        temp = (u_longptr_x[0] = u_longptr_y[0])
+    Local u_longptr_x:ULong Ptr = Varptr x
+    Local u_longptr_y:ULong Ptr = Varptr y
+    temp = (u_longptr_x[0] = u_longptr_y[0])
     'GCResume()
     Return temp
 EndFunction
@@ -124,21 +124,21 @@ EndFunction
 Function atom:Double(s:String)
     Local i:ULong = 0
     GCSuspend()
-        Local charPtr:Byte Ptr = cell
-        Local embeddedStr:String = String.FromCString(charPtr)
-        While i < hp And embeddedStr <> s
-            i :+ embeddedStr.Length + 1
-            embeddedStr = String.FromCString(charPtr + i)
-        Wend
+    Local charPtr:Byte Ptr = cell
+    Local embeddedStr:String = String.FromCString(charPtr)
+    While i < hp And embeddedStr <> s
+        i :+ embeddedStr.Length + 1
+        embeddedStr = String.FromCString(charPtr + i)
+    Wend
 
-        If i = hp
-            Local s_size:Size_T = s.Length + 1
-            hp :+ s_size
-            If hp > (sp Shl 3)
-                Print "B-LISP: Critical Error! Heap pointer greater than stack pointer!"
-            EndIf
-            s.ToUTF8StringBuffer(charPtr + i, s_size)
+    If i = hp
+        Local s_size:Size_T = s.Length + 1
+        hp :+ s_size
+        If hp > (sp Shl 3)
+            Print "B-LISP: Critical Error! Heap pointer greater than stack pointer!"
         EndIf
+        s.ToUTF8StringBuffer(charPtr + i, s_size)
+    EndIf
     GCResume()
     Return box(ATOM_TAG, i)
 End Function
@@ -156,20 +156,20 @@ End Function
 Function car:Double(p:Double) Inline
     If lispNot(p) Return nil_val ' modified
 
-    If getTag(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
-        Return cell[ord(p) + 1]
-    End If
-    Return err_val
+        If getTag(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
+            Return cell[ord(p) + 1]
+        End If
+        Return err_val
 End Function
 
 ' return the cdr of the pair or ERR if not a pair
 Function cdr:Double(p:Double) Inline
     If lispNot(p) Return nil_val ' modified
-    
-    If getTag(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
-        Return cell[ord(p)]
-    End If
-    Return err_val
+
+        If getTag(p) & ~(CONS_TAG ~ CLOS_TAG) = CONS_TAG
+            Return cell[ord(p)]
+        End If
+        Return err_val
 End Function
 
 ' NOTE currently it is only safe To use atoms - Not collections
@@ -229,7 +229,7 @@ End Function
 
 Function fourth:Double(p:Double)
     Return car(cdr(cdr(cdr(p))))
-End Function 
+End Function
 
 ' construct a pair to add to environment e, returns the list ((v . x) . e)
 Function pair:Double(v:Double, x:Double, e:Double)
@@ -255,6 +255,10 @@ End Function
 ' lispNot(x) is nonzero if x is the lisp () empty list
 Function lispNot:ULong(x:Double)
     Return getTag(x) = NIL_TAG
+End Function
+
+Function let:Ulong(x:Double)
+    Return getTag(x) <> NIL_TAG And getTag(cdr(x)) <> NIL_TAG
 End Function
 
 Function evlis:Double(t:Double, e:Double)
@@ -492,7 +496,7 @@ Function f_let:Double(t:Double, e:Double)
             cons_list = cons(cons(current_binding, nil_val), cons_list)
         Else ' use the car And cadr of the pair
             cons_list = cons(cons(car(current_binding),
-                             eval(second(current_binding), e)), cons_list)
+            eval(second(current_binding), e)), cons_list)
         End If
 
         binding_list = cdr(binding_list)
@@ -505,6 +509,17 @@ Function f_let:Double(t:Double, e:Double)
     Wend
 
     Return f_progn(sexps, e)
+End Function
+
+' Currently dangerous, can blow the stack (as paper implements it)
+' TODO make (letrec* ((f (...)) (f2 (...))) ... ) version
+Function f_letreca:Double(t:Double, e:Double)
+    While let(t)
+        e = pair(car(car(t)), err_val, e)
+        cell[sp + 2] = eval(car(cdr(car(t))), e)
+        t = cdr(t)
+    Wend
+    Return eval(car(t), e)
 End Function
 
 ' Prints all items provided
@@ -683,6 +698,7 @@ New fnPointer("cond"        , f_cond),
 New fnPointer("if"          , f_if),
 New fnPointer("let"         , f_let),
 New fnPointer("let*"        , f_let_star),
+New fnPointer("letrec*"     , f_letreca),
 New fnPointer("lambda"      , f_lambda),
 New fnPointer("define"      , f_define),
 New fnPointer("defun"       , f_defun),
@@ -704,9 +720,9 @@ New fnPointer("draw-rect"   , f_draw_rect)]
 ' create environment by extending e with the variables v bount to values t
 Function bind:Double(v:Double, t:Double, e:Double)
     Select getTag(v)
-    Case NIL_TAG Return e
-    Case CONS_TAG Return bind(cdr(v), cdr(t), pair(car(v), car(t), e))
-    Default Return pair(v, t, e)
+        Case NIL_TAG Return e
+        Case CONS_TAG Return bind(cdr(v), cdr(t), pair(car(v), car(t), e))
+        Default Return pair(v, t, e)
     End Select
 End Function
 
@@ -718,17 +734,17 @@ End Function
 
 Function Apply:Double(f:Double, t:Double, e:Double)
     Select getTag(f)
-    Case PRIM_TAG Return prim[ord(f)].f(t, e) ' look up in prim array
-    Case CLOS_TAG Return reduce(f, t, e) ' 
-    Default Return err_val
+        Case PRIM_TAG Return prim[ord(f)].f(t, e) ' look up in prim array
+        Case CLOS_TAG Return reduce(f, t, e) '
+        Default Return err_val
     End Select
 End Function
 
 Function eval:Double(x:Double, e:Double)
     Select getTag(x)
-    Case ATOM_TAG Return assoc(x, e)
-    Case CONS_TAG Return Apply(eval(car(x), e), cdr(x), e)
-    Default Return x
+        Case ATOM_TAG Return assoc(x, e)
+        Case CONS_TAG Return Apply(eval(car(x), e), cdr(x), e)
+        Default Return x
     End Select
 End Function
 
@@ -750,18 +766,18 @@ End Function
 
 Function lispPrint(x:Double)
     Select getTag(x)
-    Case NIL_TAG prin "()"
-    Case ATOM_TAG
-        GCSuspend()
+        Case NIL_TAG prin "()"
+        Case ATOM_TAG
+            GCSuspend()
             Local A:Byte Ptr = cell
             prin "".FromCString(A+ord(x))
-        GCResume()
-    Case PRIM_TAG prin "PRIM-FN<" + prim[ord(x)].s + ">"
-    Case CONS_TAG printlist(x)
-    Case CLOS_TAG prin "CLOSURE<" + ULong(ord(x)) + ">"
-    Default
-        Local F:TFormatter = New TFormatter.Create("%.10f") ' test
-        prin F.arg(x).format()
+            GCResume()
+        Case PRIM_TAG prin "PRIM-FN<" + prim[ord(x)].s + ">"
+        Case CONS_TAG printlist(x)
+        Case CLOS_TAG prin "CLOSURE<" + ULong(ord(x)) + ">"
+        Default
+            Local F:TFormatter = New TFormatter.Create("%.10f") ' test
+            prin F.arg(x).format()
     End Select
 End Function
 
@@ -778,8 +794,8 @@ Function gc()
     Next
 
     GCSuspend()
-        Local A:Byte Ptr = cell
-        hp :+ String.fromCString(A + hp).length + 1
+    Local A:Byte Ptr = cell
+    hp :+ String.fromCString(A + hp).length + 1
     GCResume()
 End Function
 
@@ -788,8 +804,8 @@ Function debugPrint(x:Double)
     Local mask:ULong = $ff
 
     GCSuspend()
-        Local u_longptr:ULong Ptr = Varptr x
-        val = u_longptr[0]
+    Local u_longptr:ULong Ptr = Varptr x
+    val = u_longptr[0]
     GCResume()
 
     mask :Shl 56
@@ -822,16 +838,16 @@ Function debugPrint(x:Double)
         End If
 
         If (val & mask) bitBuffer :+ "1" Else bitBuffer :+ "0"
-        mask :Shr 1
+            mask :Shr 1
 
-        ' label buffer updates
-        If i = 0
-            labelBuffer :+ "s"
-        Else If i > 0 And i < 12
-            labelBuffer :+ "e"
-        Else
-            labelBuffer :+ "m"
-        End If
+            ' label buffer updates
+            If i = 0
+                labelBuffer :+ "s"
+            Else If i > 0 And i < 12
+                labelBuffer :+ "e"
+            Else
+                labelBuffer :+ "m"
+            End If
 
     Next
     Print labelBuffer
