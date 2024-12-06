@@ -388,10 +388,9 @@ Function f_eq:Double(t:Double, e:Double)
     Return nil_val
 End Function
 
+' TODO Double check
 Function f_eqNum:Double(t:Double, e:Double)
     t = evlis(t, e)
-    If getTag(car(t)) <> PRIM_TAG Then Return err_val
-    If getTag(second(t)) <> PRIM_TAG Then Return err_val
     If car(t) = second(t) Then Return tru_val
     Return nil_val
 End Function
@@ -648,10 +647,13 @@ Function f_unit_test:Double(t:Double, e:Double)
     ' pray For BlitzMax
     ' (lambda (i) (lambda (x) (+ x i)))
     Local inpt:Double = cons(atom("lambda"), cons(cons(atom("i"), nil_val), cons(cons(atom("lambda"), cons(cons(atom("x"), nil_val), cons(cons(atom("+"), cons(atom("x"), cons(atom("i"), nil_val))), nil_val))), nil_val)))
+    Local answer:Double = num(30)
+    
     Local generator:Double = eval(inpt, e)
     Local clos:Double = eval(cons(generator, cons(num(10.0), nil_Val)), e)
     Local ret:Double = eval(cons(clos, cons(num(20.0), nil_Val)), e)
-    Return ret
+    Local passed:Double = f_eqNum(cons(ret, cons(answer, nil_val)), e)
+    Return passed
 End function
 
 Function f_dummy:Double(t:Double, e:Double)
@@ -783,8 +785,6 @@ Function printlist(t:Double)
     Forever
     prin ")"
 End Function
-
-
 
 Function lispPrint(x:Double)
     Select getTag(x)
