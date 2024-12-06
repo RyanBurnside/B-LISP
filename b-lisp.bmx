@@ -641,6 +641,17 @@ Function f_draw_rect:Double(t:Double, e:Double)
     Local parsed:Double = evlis(t, e) ' meh optimize in future
     DrawRect car(parsed), second(parsed), third(parsed), fourth(parsed)
     Return nil_val
+End Function
+
+Function f_unit_test:Double(t:Double, e:Double)
+    Local parsed:Double = evlis(t, e) ' meh optimize in future
+    ' pray For BlitzMax
+    ' (lambda (i) (lambda (x) (+ x i)))
+    Local inpt:Double = cons(atom("lambda"), cons(cons(atom("i"), nil_val), cons(cons(atom("lambda"), cons(cons(atom("x"), nil_val), cons(cons(atom("+"), cons(atom("x"), cons(atom("i"), nil_val))), nil_val))), nil_val)))
+    Local generator:Double = eval(inpt, e)
+    Local clos:Double = eval(cons(generator, cons(num(10.0), nil_Val)), e)
+    Local ret:Double = eval(cons(clos, cons(num(20.0), nil_Val)), e)
+    Return ret
 End function
 
 Function f_dummy:Double(t:Double, e:Double)
@@ -648,6 +659,14 @@ Function f_dummy:Double(t:Double, e:Double)
     Return nil_val
 End Function
 
+Function niy(killLisp:Int = 0, msg:String = "Unhandled situation")
+    Print "NIY: " + msg
+    If killLisp
+        Print "You are returning To the BlitzMax shell, press q hit Enter."
+        Throw "Shit my pants - damn."
+    End if
+End Function
+    
 ' table of Lisp primitives, each has a name s And a Function pointer f
 Type fnPointer
     Field s:String
@@ -715,7 +734,8 @@ New fnPointer("cls"         , f_cls),
 New fnPointer("flip"        , f_flip),
 New fnPointer("set-color"   , f_set_color),
 New fnPointer("draw-line"   , f_draw_line),
-New fnPointer("draw-rect"   , f_draw_rect)]
+New fnPointer("draw-rect"   , f_draw_rect),
+New fnPointer("unit-test"   , f_unit_test)]
 
 ' create environment by extending e with the variables v bount to values t
 Function bind:Double(v:Double, t:Double, e:Double)
@@ -764,6 +784,8 @@ Function printlist(t:Double)
     prin ")"
 End Function
 
+
+
 Function lispPrint(x:Double)
     Select getTag(x)
         Case NIL_TAG prin "()"
@@ -780,6 +802,54 @@ Function lispPrint(x:Double)
             prin F.arg(x).format()
     End Select
 End Function
+
+Function apiPrintlist(t:Double)
+    Local listLength:ULong = 0
+    Repeat
+        listLength:ULong :+ 1
+        prin "cons("
+        apiPrint car(t)
+        
+        t = cdr(t)
+        If getTag(t) = NIL_TAG
+            prin ", "
+            apiPrint(t)
+            Exit
+        End If 
+        If getTag(t) <> CONS_TAG
+            prin ", "
+            apiPrint(t)
+            Exit
+        End If
+        prin ", "
+    Forever
+    For Local i:ULong = 0 Until listLength
+        prin ")"
+    Next
+End Function
+
+Function apiPrint(x:Double)
+    Select getTag(x)
+        Case NIL_TAG prin "nil_val"
+        Case ATOM_TAG
+            GCSuspend()
+            Local A:Byte Ptr = cell
+            prin "atom(~q" + "".FromCString(A+ord(x)) + "~q)"
+            GCResume()
+        Case PRIM_TAG
+            GCSuspend()
+            Local A:Byte Ptr = cell
+            prin "prim[ord(atom(~q" + prim[ord(x)].s + "~q))].s"
+            GCResume()
+        Case CONS_TAG apiPrintlist(x)
+        Case CLOS_TAG
+            niy(1, "apiPrint(): CLOSURE<" + ULong(ord(x)) + ">")
+        Default
+            Local F:TFormatter = New TFormatter.Create("%.10f") ' test
+            prin "num(" + F.arg(x).format() + ")"
+    End Select
+End Function
+
 
 ' Yeah, this isn't going to stick around Forever. :D
 ' Function gc()
@@ -878,29 +948,3 @@ Function dump()
     GCResume()
 End Function
 
-Function nan_main:Int()
-    Print "Starting B-LISP"
-    nil_val = box(NIL_TAG, 0)
-    err_val = atom("ERR")
-    tru_val = atom("t")
-    env_val = pair(tru_val, tru_val, nil_val)
-    For Local i:ULong = 0 Until prim.Length
-        env_val = pair(atom(prim[i].s), box(PRIM_TAG, i), env_val)
-    Next
-
-    Local val_a:Double = num(64)
-    Local val_b:Double = num(36)
-    For Local op:String = EachIn ["*", "/", "+", "-"]
-        Local expr:Double = cons(atom(op), cons(val_a, cons(val_b, nil_val)))
-        Print "Doing the function: " + op + " with values: a: " + val_a + " b: " + val_b
-        Print "Result is : " + eval(expr, env_val)
-    Next
-
-    Local subLis:Double = cons(box(PRIM_TAG, 6), cons(22, cons(32, nil_val)))
-    Local sexp:Double = cons(box(PRIM_TAG, 5), cons(22, cons(subLis, cons(42, nil_val))))
-    Print ""
-    lispPrint(sexp)
-    Print "~n"
-    prin ">>>" + eval(sexp, env_val)
-    Return 0
-End Function

@@ -59,13 +59,27 @@ Function parser_main()
         lispPrint(sexp)
         Print ""
 
+        prin "; Parsed Lisp Object in API Form: "
+        prin "; "
+        apiPrint(sexp)
+        Print ""
+
+        
         ' EVAL
         ret = eval(sexp, env_val)
 
         ' PRINT
+        Print "; This is Lisp Print"
         Print ""
         lispPrint(ret)
+        Print "~n"
+
+        Print "; This is Api Print"
         Print ""
+        prin "; "
+        apiPrint(ret)
+        Print "~n"
+        
         gc()
     Until equ(ret, quit_val)
 End Function
