@@ -669,8 +669,8 @@ Function f_dummy:Double(t:Double, e:Double)
     Return nil_val
 End Function
 
-Function notImpYet(killLisp:Int = 0, msg:String = "Unhandled situation")
-    Print "Not Implemented Yet: " + msg
+Function notImpYet(killLisp:Int = 0, msg:String = "")
+    Print msg
     If killLisp
         Print "You are returning To the BlitzMax shell, press q hit Enter."
         Throw "Exiting B-LISP."
@@ -852,7 +852,8 @@ Function apiPrint(x:Double)
             GCResume()
         Case CONS_TAG apiPrintlist(x)
         Case CLOS_TAG
-            notImpYet(0, "apiPrint(): CLOSURE<" + ULong(ord(x)) + ">")
+            notImpYet(0, "~qNot implemented yet: " + ..
+            "apiPrint(): CLOSURE<" + ULong(ord(x)) + ">~q")
         Default
             Local F:TFormatter = New TFormatter.Create("%.10f") ' test
             prin "num(" + F.arg(x).format() + ")"
