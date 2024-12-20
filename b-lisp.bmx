@@ -118,7 +118,7 @@ Function equ:ULong(x:Double, y:Double)
     temp = (u_longptr_x[0] = u_longptr_y[0])
     'GCResume()
     Return temp
-EndFunction
+End Function
 
 ' interning of atom names (Lisp symbols), returns a unique NaN-boxed ATOM
 Function atom:Double(s:String)
@@ -530,6 +530,10 @@ Function f_print:Double(t:Double, e:Double)
     Return nil_val
 End Function
 
+Function f_random:Double(t:Double, e:Double)
+    Return RndDouble()
+End function
+
 Function f_terpri:Double(t:Double, e:Double)
     Print "" ' just a New line
     Return nil_val
@@ -646,7 +650,11 @@ Function f_unit_test:Double(t:Double, e:Double)
     Local parsed:Double = evlis(t, e) ' meh optimize in future
     ' pray For BlitzMax
     ' (lambda (i) (lambda (x) (+ x i)))
-    Local inpt:Double = cons(atom("lambda"), cons(cons(atom("i"), nil_val), cons(cons(atom("lambda"), cons(cons(atom("x"), nil_val), cons(cons(atom("+"), cons(atom("x"), cons(atom("i"), nil_val))), nil_val))), nil_val)))
+    Local inpt:Double = cons(atom("lambda"), cons(cons(atom("i"), nil_val),
+                                             cons(cons(atom("lambda"),
+                                             cons(cons(atom("x"), nil_val),
+                        cons(cons(atom("+"), cons(atom("x"), cons(atom("i"),
+                        nil_val))), nil_val))), nil_val)))
     Local answer:Double = num(30)
     
     Local generator:Double = eval(inpt, e)
@@ -661,11 +669,11 @@ Function f_dummy:Double(t:Double, e:Double)
     Return nil_val
 End Function
 
-Function niy(killLisp:Int = 0, msg:String = "Unhandled situation")
-    Print "NIY: " + msg
+Function notImpYet(killLisp:Int = 0, msg:String = "Unhandled situation")
+    Print "Not Implemented Yet: " + msg
     If killLisp
         Print "You are returning To the BlitzMax shell, press q hit Enter."
-        Throw "Shit my pants - damn."
+        Throw "Exiting B-LISP."
     End if
 End Function
     
@@ -696,8 +704,8 @@ New fnPointer("car"         , f_car),
 New fnPointer("cdr"         , f_cdr),
 ' Mutating functions
 New fnPointer("setq"        , f_setq),
-New fnPointer("rplaca"       , f_rplaca),
-New fnPointer("rplacd"       , f_rplacd),
+New fnPointer("rplaca"      , f_rplaca),
+New fnPointer("rplacd"      , f_rplacd),
 ' ----
 New fnPointer("+"           , f_add),
 New fnPointer("-"           , f_sub),
@@ -727,6 +735,7 @@ New fnPointer("progn"       , f_progn),
 New fnPointer("prog1"       , f_prog1),
 New fnPointer("prog2"       , f_prog2),
 New fnPointer("print"       , f_print),
+New fnPointer("random"      , f_random),
 New fnPointer("terpri"      , f_terpri),
 New fnPointer("time"        , f_time),
 New fnPointer("quit"        , f_quit),
@@ -843,7 +852,7 @@ Function apiPrint(x:Double)
             GCResume()
         Case CONS_TAG apiPrintlist(x)
         Case CLOS_TAG
-            niy(1, "apiPrint(): CLOSURE<" + ULong(ord(x)) + ">")
+            notImpYet(0, "apiPrint(): CLOSURE<" + ULong(ord(x)) + ">")
         Default
             Local F:TFormatter = New TFormatter.Create("%.10f") ' test
             prin "num(" + F.arg(x).format() + ")"

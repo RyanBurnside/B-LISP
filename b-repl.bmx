@@ -12,16 +12,11 @@ Function printBanner()
     Print "; ######        ###### ###  ######  #      "
     Print ""
     Print "; Ryan Burnside 1976 ver: Pre-Alpha"
-    Print ""
+    Print "; Enter (quit) to leave the REPL.~n"
 End Function
 
 Function lexer_main()
-    Local statements:String = """
-        (* (+ FOO *BAR* +BAZ+) |foobar| BAZ 42 43.5)
-        (/ 3 4)
-        `(,SYM ,@(1 2 3 4))
-        '(3 . 4)
-"""
+    Local statements:String = "  (* (+ FOO *BAR* +BAZ+) |foobar| BAZ 42 43.5)  (/ 3 4) `(,SYM ,@(1 2 3 4)) '(3 . 4)"
     Local lexer:Lexer = New Lexer(makeRegexTableBlisp(), statements)
 
     Local nextToken:Token = lexer.NextToken()
@@ -29,7 +24,7 @@ Function lexer_main()
         nextToken.Print()
         nextToken = lexer.NextToken()
     Wend
-    nextToken.Print()
+nextToken.Print()
 End Function
 
 Function parser_main()
@@ -46,9 +41,8 @@ Function parser_main()
         Local statements:String = ""
         Local prompt:String = "B-LISP[" + cellsUsed + "/" + cellsRemaining + "]> "
 
-
         Repeat statements = Input(prompt) 'GUI.prompt(prompt)
-        statements.Trim()
+            statements.Trim()
         Until statements <> ""
 
         Print "; Statements: " + statements
@@ -64,7 +58,6 @@ Function parser_main()
         apiPrint(sexp)
         Print ""
 
-        
         ' EVAL
         ret = eval(sexp, env_val)
 
@@ -79,14 +72,14 @@ Function parser_main()
         prin "; "
         apiPrint(ret)
         Print "~n"
-        
+
         gc()
     Until equ(ret, quit_val)
 End Function
 
 Function main()
-'    nan_main()
-'    lexer_main()
+    '    nan_main()
+    '    lexer_main()
     parser_main()
 End Function
 
