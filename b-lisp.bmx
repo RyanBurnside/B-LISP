@@ -72,7 +72,7 @@ Function tagToString:String(tag:ULong)
     End Select
 End Function
 
-' We want to force the Lisp expression (double) into being read as an unsighed int
+' We want to force the Lisp expression (double) into being read as an unsigned int
 ' this allows us to shift the bits and find the tag it was encoded with
 Function getTag:ULong(x:Double) Inline
     'GCSuspend()
@@ -244,6 +244,9 @@ Function closure:Double(v:Double, x:Double, e:Double)
 End Function
 
 ' look up a symbol in an environment, return its value or err if not found
+' This is different behavior than Common Lisp which returns (key value)
+' returns value For dotted pairs, returns (value) for lists pairs.
+' this is a poorly named system level thing, not a repl thing
 Function assoc:Double(v:Double, e:Double)
     While getTag(e) = CONS_TAG And (Not equ(v, car(car(e))))
         e = cdr(e)
@@ -281,9 +284,18 @@ End Function
 ' t is a parameters list, e is the Global environment
 ' --------------------------------------------------------------------
 
+' Since assoc above is a system thing, this is the proper abstraction for Lisp
+Function lisp_assoc:Double(v:Double, e:Double)
+    While getTag(e) = CONS_TAG And (Not equ(v, car(car(e))))
+        e = cdr(e)
+    Wend
+    If getTag(e) = CONS_TAG Then Return car(e)
+    Return nil_val
+End Function
+
 Function f_assoc:Double(t:Double, e:Double)
     Local tt:Double = evlis(t, e)
-    Return assoc(car(tt), second(tt))
+    Return lisp_assoc(car(tt), second(tt))
 End Function
 
 Function f_atoms_family:Double(t:Double, e:Double)
@@ -647,22 +659,13 @@ Function f_draw_rect:Double(t:Double, e:Double)
 End Function
 
 Function f_unit_test:Double(t:Double, e:Double)
-    Local parsed:Double = evlis(t, e) ' meh optimize in future
-    ' pray For BlitzMax
-    ' (lambda (i) (lambda (x) (+ x i)))
-    Local inpt:Double = cons(atom("lambda"), cons(cons(atom("i"), nil_val),
-                                             cons(cons(atom("lambda"),
-                                             cons(cons(atom("x"), nil_val),
-                        cons(cons(atom("+"), cons(atom("x"), cons(atom("i"),
-                        nil_val))), nil_val))), nil_val)))
-    Local answer:Double = num(30)
-    
-    Local generator:Double = eval(inpt, e)
-    Local clos:Double = eval(cons(generator, cons(num(10.0), nil_Val)), e)
-    Local ret:Double = eval(cons(clos, cons(num(20.0), nil_Val)), e)
-    Local passed:Double = f_eqNum(cons(ret, cons(answer, nil_val)), e)
-    Return passed
-End function
+    Local testCounter:Int  = 0
+    If test_lambda(t, e)
+        Print "Lambda test passed"
+        testCounter :+ 1
+    End If
+    Return testCounter
+End Function
 
 Function f_dummy:Double(t:Double, e:Double)
     Print "Not yet implimented"
@@ -687,7 +690,6 @@ Type fnPointer
     End Method
 End Type
 
-
 ' --------------------------------------------------------------------
 ' This is a table of primitive functions called by symbol lookup
 ' --------------------------------------------------------------------
@@ -702,7 +704,7 @@ New fnPointer("cons"        , f_cons),
 New fnPointer("list"        , f_list),
 New fnPointer("car"         , f_car),
 New fnPointer("cdr"         , f_cdr),
-' Mutating functions
+' Mutating functions - Not allowed To change Data length (currnetly)
 New fnPointer("setq"        , f_setq),
 New fnPointer("rplaca"      , f_rplaca),
 New fnPointer("rplacd"      , f_rplacd),
@@ -958,3 +960,25 @@ Function dump()
     GCResume()
 End Function
 
+Function test_lambda:Double(t:Double, e:double)
+    Local parsed:Double = evlis(t, e) ' meh optimize in future
+    ' pray For BlitzMax
+    ' (lambda (i) (lambda (x) (+ x i)))
+    Local inpt:Double = cons(atom("lambda"), cons(cons(atom("i"), nil_val),
+                                             cons(cons(atom("lambda"),
+                                             cons(cons(atom("x"), nil_val),
+                        cons(cons(atom("+"), cons(atom("x"), cons(atom("i"),
+                        nil_val))), nil_val))), nil_val)))
+    Local answer:Double = num(30)
+    
+    Local generator:Double = eval(inpt, e)
+    Local clos:Double = eval(cons(generator, cons(num(10.0), nil_Val)), e)
+    Local ret:Double = eval(cons(clos, cons(num(20.0), nil_Val)), e)
+    Local passed:Double = f_eqNum(cons(ret, cons(answer, nil_val)), e)
+    Return passed
+End Function
+
+Function test_assoc:Double(t:Double, e:Double)
+    Local Input:Double = cons(atom("assoc"), cons(cons(atom("quote"), cons(cons(cons(atom("a"), cons(atom("b"), nil_val)), cons(cons(atom("c"), cons(atom("d"), nil_val)), nil_val)), nil_val)), cons(cons(atom("quote"), cons(atom("a"), nil_val)), nil_val)))
+
+End Function

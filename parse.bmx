@@ -20,27 +20,27 @@ Enum TokenType
     LDOT,
     SKIP, ' Handles whitespace
     ERROR,
-    LAZYCLOSE, ' ] closes all trailing parens ending exp
+    LAZYCLOSE, ' ] closes all trailing parens ending Exp TODO implement [
     TEXT_EOF
 End Enum
 
 
 Function stringToTokenType:TokenType(str:String)
     Select str
-    Case "ATOM" Return TokenType.SYMBOL
-    Case "SYMBOL" Return TokenType.SYMBOL
-    Case "NUMBER" Return TokenType.NUMBER
+    Case "ATOM"      Return TokenType.SYMBOL
+    Case "SYMBOL"    Return TokenType.SYMBOL
+    Case "NUMBER"    Return TokenType.NUMBER
     Case "BACKQUOTE" Return TokenType.BACKQUOTE
-    Case "SPLICE" Return TokenType.SPLICE
-    Case "COMMA" Return TokenType.COMMA
-    Case "QUOTE" Return TokenType.QUOTE
-    Case "LPAREN" Return TokenType.LPAREN
-    Case "RPAREN" Return TokenType.RPAREN
-    Case "LDOT" Return TokenType.LDOT
-    Case "SKIP" Return TokenType.SKIP
+    Case "SPLICE"    Return TokenType.SPLICE
+    Case "COMMA"     Return TokenType.COMMA
+    Case "QUOTE"     Return TokenType.QUOTE
+    Case "LPAREN"    Return TokenType.LPAREN
+    Case "RPAREN"    Return TokenType.RPAREN
+    Case "LDOT"      Return TokenType.LDOT
+    Case "SKIP"      Return TokenType.SKIP
     Case "LAZYCLOSE" Return TokenType.LAZYCLOSE
-    Case "ERROR" Return TokenType.ERROR
-    Default Return TokenType.ERROR
+    Case "ERROR"     Return TokenType.ERROR
+    Default          Return TokenType.ERROR
     End Select
 End Function
 
