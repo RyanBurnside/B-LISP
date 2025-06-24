@@ -17,15 +17,16 @@ End Function
 
 Function parser_main()
     Local ret:Double
+    Local b:Blisp = New Blisp() 'make an instance with default prim table
     ' Local GUI:REPLWindow = New REPLWindow()
     printBanner()
 
-    resetMachine()
+    b.resetMachine()
 
     Repeat
         ' READ
-        Local cellsUsed:ULong = N - sp
-        Local cellsRemaining:ULong = sp - Ceil(hp / 8.0)
+        Local cellsUsed:ULong = b.N - b.sp
+        Local cellsRemaining:ULong = b.sp - Ceil(b.hp / 8.0)
         Local statements:String = ""
         Local prompt:String = "B-LISP[" + cellsUsed + "/" + cellsRemaining + "]> "
 
@@ -35,34 +36,34 @@ Function parser_main()
 
         Print "; Statements: " + statements
         Local lexer:Lexer = New Lexer(makeRegexTableBlisp(), statements)
-        Local parser:Parser = New Parser(lexer)
+        Local parser:Parser = New Parser(b, lexer)
         Local sexp:Double = parser.parse()
-        prin "; Parsed Lisp Object: "
-        lispPrint(sexp)
+        b.prin "; Parsed Lisp Object: "
+        b.lispPrint(sexp)
         Print ""
 
-        prin "; Parsed Lisp Object in API Form: "
-        prin "; "
-        apiPrint(sexp)
+        b.prin "; Parsed Lisp Object in API Form: "
+        b.prin "; "
+        b.apiPrint(sexp)
         Print ""
 
         ' EVAL
-        ret = eval(sexp, env_val)
+        ret = b.eval(sexp, b.env_val)
 
         ' PRINT
         Print "; This is Lisp Print"
         Print ""
-        lispPrint(ret)
+        b.lispPrint(ret)
         Print "~n"
 
         Print "; This is Api Print"
         Print ""
-        prin "; "
-        apiPrint(ret)
+        b.prin "; "
+        b.apiPrint(ret)
         Print "~n"
 
-        gc()
-    Until equ(ret, quit_val)
+        b.gc()
+    Until b.equ(ret, b.quit_val)
 End Function
 
 Function main()

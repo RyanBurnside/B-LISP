@@ -147,9 +147,11 @@ Type Parser
     Field lexer:Lexer
     Field currTok:Token
     Field nestDepth:Double = 0
-
-    Method New(lexer:Lexer)
+    Field b:Blisp
+    
+    Method New(b:Blisp, lexer:Lexer)
         Self.lexer = lexer
+        Self.b = b
         currTok = lexer.NextToken()
     End Method
 
@@ -184,12 +186,12 @@ Type Parser
 
     Method parseNumber:Double()
         Local numTok:Token = accept()
-        Return num(Double(numTok.value))
+        Return b.num(Double(numTok.value))
     End Method
 
     Method parseSymbol:Double()
         Local symTok:Token = accept()
-        Return atom(symTok.value)
+        Return b.atom(symTok.value)
      End Method
 
     Method parseList:Double()
@@ -198,12 +200,12 @@ Type Parser
         If match(TokenType.LAZYCLOSE)
             nestDepth :- 1
             If nestDepth = 0 Then accept()
-            Return nil_val
+            Return b.nil_val
         End If
 
         If match(TokenType.RPAREN)
             accept() ' Tosses right paren
-            Return nil_val
+            Return b.nil_val
         End If
 
         If match(TokenType.LDOT)
@@ -214,10 +216,10 @@ Type Parser
         End If
 
         expr:Double = parse()
-        Return cons(expr, parseList())
+        Return b.cons(expr, parseList())
     End Method
 
     Method parseQuote:Double()
-        Return cons(atom("quote"), cons(parse(), nil_val))
+        Return b.cons(b.atom("quote"), b.cons(parse(), b.nil_val))
     End Method
 End Type
